@@ -1,5 +1,5 @@
 import xml.etree.ElementTree as ET
-import sqlite3
+import pandas as pd
 import time
 
 def convert_and_store_ETagPairLive(store_path, conn):
@@ -82,7 +82,64 @@ def convert_and_store_traffic_accident(store_path, conn):
     """
     print("\tProcess traffic accident data from file: ", store_path)
     ###開始###
-    
+    create_table_query = '''
+    CREATE TABLE IF NOT EXISTS traffic_accident (
+        年 INTEGER,
+        月 INTEGER,
+        日 INTEGER,
+        時 INTEGER,
+        分 INTEGER,
+        國道名稱 TEXT,
+        方向 TEXT,
+        里程 REAL,
+        事件發生 TEXT,
+        交控中心接獲通報 TEXT,
+        CCTV監看現場 TEXT,
+        CMS發布資訊 TEXT,
+        交控中心通報工務段 TEXT,
+        事故處理小組出發 TEXT,
+        事故處理小組抵達 TEXT,
+        事故處理小組完成 TEXT,
+        事件排除 TEXT,
+        處理分鐘 INTEGER,
+        事故類型 TEXT,
+        死亡 INTEGER,
+        受傷 INTEGER,
+        內路肩 INTEGER,
+        內車道 INTEGER,
+        中內車道 INTEGER,
+        中車道 INTEGER,
+        中外車道 INTEGER,
+        外車道 INTEGER,
+        外路肩 INTEGER,
+        匝道 INTEGER,
+        簡訊內容 TEXT,
+        翻覆事故註記 INTEGER,
+        施工事故註記 INTEGER,
+        危險物品車輛註記 INTEGER,
+        車輛起火註記 INTEGER,
+        冒煙車事故註記 INTEGER,
+        主線中斷註記 INTEGER,
+        肇事車輛 TEXT,
+        車輛1 TEXT,
+        車輛2 TEXT,
+        車輛3 TEXT,
+        車輛4 TEXT,
+        車輛5 TEXT,
+        車輛6 TEXT,
+        車輛7 TEXT,
+        車輛8 TEXT,
+        車輛9 TEXT,
+        車輛10 TEXT,
+        車輛11 TEXT,
+        車輛12 TEXT,
+        分局 TEXT
+    )
+    '''
+    conn.db.cursor().execute(create_table_query)
+    data_file = pd.read_excel(store_path)
+    data_file.to_sql('traffic_accident', conn.db, if_exists='replace', index=True)
+    conn.db.commit()
     ###結束###
 
 def convert_and_store_construction_zone(store_path, conn):
@@ -96,5 +153,21 @@ def convert_and_store_construction_zone(store_path, conn):
     """
     print("\tProcess construction zone data from file: ", store_path)
     ###開始###
-    
+    create_table_query = '''
+    CREATE TABLE IF NOT EXISTS construction_zone (
+        incStepIncidentId INTEGER,
+        incStepNum INTEGER,
+        incStepTime TEXT,
+        incStepEndTime TEXT,
+        incStepFreewayId TEXT,
+        incStepDirection TEXT,
+        incStepStartMileage REAL,
+        incStepEndMileage REAL,
+        incStepBlockagePattern TEXT
+    )
+    '''
+    conn.db.cursor().execute(create_table_query)
+    data_file = pd.read_excel(store_path)
+    data_file.to_sql('construction_zone', conn.db, if_exists='replace', index=True)
+    conn.db.commit()
     ###結束###
