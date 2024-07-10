@@ -3,12 +3,13 @@ import os
 
 # https://docs.python.org/zh-tw/3/library/sqlite3.html
 class database:
-    def __init__(self):
+    def __init__(self, file_name):
+        self.file_name = file_name
         self.db = self.__connect()
 
     def __connect(self):
         try:
-            connection = sqlite3.connect(self.__get_path('assets/database.db'))
+            connection = sqlite3.connect(self.__get_path('assets/' + self.file_name))
         except:
             raise EnvironmentError("Failed to connect to the database")
         print("\tConnected to the database")

@@ -6,14 +6,14 @@ import pathlib
 from urllib.parse import urlparse
 from io import BytesIO
 import time 
-from .process_data import process_ETagPairLive, process_traffic_accident, process_construction_zone
+from .convert_data import convert_and_store_ETagPairLive, convert_and_store_traffic_accident, convert_and_store_construction_zone
 from .db import database
 
 class GetData:
     def __init__(self):
         os.makedirs(self.__get_path ('assets/'), exist_ok=True)
         self.__data_types = ["ETagPairLive", "traffic_accident", "construction_zone"]
-        self.Database = database()
+        self.Database = database(file_name = 'row_data.db')
         self.__fetch_all_data()
 
     # not finish yet 
@@ -23,23 +23,23 @@ class GetData:
         and call fetch_data() to get data
         """
         ### begin of test ###
-        url = "https://tisvcloud.freeway.gov.tw/history/motc20/ETag/20240302/ETagPairLive_2320.xml.gz"
-        file_name = "ETagPairLive_2320.xml"
-        data_type = "ETagPairLive"
-        self.__fetch_data(url, file_name, data_type, skip_exist=False, delete_file=False)
+        # url = "https://tisvcloud.freeway.gov.tw/history/motc20/ETag/20240302/ETagPairLive_2320.xml.gz"
+        # file_name = "ETagPairLive_2320.xml"
+        # data_type = "ETagPairLive"
+        # self.__fetch_data(url, file_name, data_type, skip_exist=False, delete_file=False)
 
-        url = "https://freeway2024.tw/112%E5%B9%B41-10%E6%9C%88%E4%BA%A4%E9%80%9A%E4%BA%8B%E6%95%85%E7%B0%A1%E8%A8%8A%E9%80%9A%E5%A0%B1%E8%B3%87%E6%96%99.xlsx"
-        file_name = "112年1-10月及113年1-2月交通事故簡訊通報狀況資料之分析資料.xlsx"
-        data_type = "traffic_accident"
-        self.__fetch_data(url, file_name, data_type, skip_exist=False, delete_file=False)
+        # url = "https://freeway2024.tw/112%E5%B9%B41-10%E6%9C%88%E4%BA%A4%E9%80%9A%E4%BA%8B%E6%95%85%E7%B0%A1%E8%A8%8A%E9%80%9A%E5%A0%B1%E8%B3%87%E6%96%99.xlsx"
+        # file_name = "112年1-10月及113年1-2月交通事故簡訊通報狀況資料之分析資料.xlsx"
+        # data_type = "traffic_accident"
+        # self.__fetch_data(url, file_name, data_type, skip_exist=False, delete_file=False)
 
-        url = "https://freeway2024.tw/112%E5%B9%B41-10%E6%9C%88%E9%81%93%E8%B7%AF%E6%96%BD%E5%B7%A5%E8%B7%AF%E6%AE%B5%E8%B3%87%E6%96%99.xlsx"
-        file_name = "112年1-10月及113年1-2月施工路段資料之分析資料.xlsx"
-        data_type = "construction_zone"
-        self.__fetch_data(url, file_name, data_type, skip_exist=False, delete_file=False)
+        # url = "https://freeway2024.tw/112%E5%B9%B41-10%E6%9C%88%E9%81%93%E8%B7%AF%E6%96%BD%E5%B7%A5%E8%B7%AF%E6%AE%B5%E8%B3%87%E6%96%99.xlsx"
+        # file_name = "112年1-10月及113年1-2月施工路段資料之分析資料.xlsx"
+        # data_type = "construction_zone"
+        # self.__fetch_data(url, file_name, data_type, skip_exist=False, delete_file=False)
         ### end of test ###
 
-        # self.__fetch_all_ETagPairLive()
+        self.__fetch_all_ETagPairLive()
 
     # not finish yet 
     def __fetch_data(self, url, file_name, data_type, addition_path="", skip_exist=True, delete_file=True):
@@ -59,19 +59,17 @@ class GetData:
 
         # check if file exist
         store_path = self.__get_path('assets/'+addition_path+'/'+file_name)
-        if skip_exist:
-            if os.path.exists(store_path):
-                print("file \"" + file_name + "\" exist in asset, skip url:"+ url)
-                return
+        if skip_exist and self.__check_gotton(store_path, addition_path+'/'+file_name):
+            return
 
         # main function
         folder, url_file_name, extensions = self.__get_url_file_name(url)
         requested_file = self.__request_file(url)
         self.__unzip_and_store_file(requested_file, store_path, extensions)
-        self.__process_data(file_name, store_path, data_type)
-        # self.__store_data()
+        self.__process_and_store_data(file_name, store_path, data_type, self.Database)
         if delete_file:
             self.__delete_file(store_path)
+        self.__enroll_file(addition_path+'/'+file_name)
 
     def __get_url_file_name(self, url):
         if not url:
@@ -108,7 +106,7 @@ class GetData:
                 f_out.write(requested_file)
 
     # can be extend
-    def __process_data(self, file_name, store_path, data_type):
+    def __process_and_store_data(self, file_name, store_path, data_type, Database):
         if not file_name:
             raise ValueError("file_name is empty, should be a valid file name")
         if not store_path:
@@ -118,11 +116,11 @@ class GetData:
         
         # process data here
         if data_type == "ETagPairLive":
-            process_ETagPairLive(store_path)
+            convert_and_store_ETagPairLive(store_path, Database)
         elif data_type == "traffic_accident":
-            process_traffic_accident(store_path)
+            convert_and_store_traffic_accident(store_path, Database)
         elif data_type == "construction_zone":
-            process_construction_zone(store_path)
+            convert_and_store_construction_zone(store_path, Database)
 
     def __delete_file(self, store_path):
         if not store_path:
@@ -149,6 +147,26 @@ class GetData:
                         file_name = "ETagPairLive_" + '{:02}'.format(hour) + '{:02}'.format(min) + ".xml"
                         url = url_day + file_name + ".gz"
                         self.__fetch_data(url, file_name, data_type, addition_path=addition_path, skip_exist=True)
+
+    def __check_gotton(self, store_path, file_name):
+        if os.path.exists(store_path):
+            print("file \"" + file_name + "\" exist in asset, skip file:"+ file_name)
+            return 1
+        try:
+            with open(self.__get_path('assets/file_list.txt'), 'r') as f:
+                if file_name in f.read():
+                    print("file \"" + file_name + "\" exist in asset, skip file:"+ file_name)
+                    return 1 
+        except:
+            if os.path.exists(self.__get_path('assets/file_list.txt')) == False:
+                with open(self.__get_path('assets/file_list.txt'), 'w') as f:
+                    f.write('')
+                    return 0
+        return 0
+    
+    def __enroll_file(self, file_name):
+        with open(self.__get_path('assets/file_list.txt'), 'a') as f:
+            f.write(file_name + '\n')
 
     def __get_path (self, file_name):
         current_file_path = os.path.realpath(__file__)
