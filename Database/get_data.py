@@ -3,9 +3,10 @@ import gzip
 import shutil
 import os
 import pathlib
+import time 
 from urllib.parse import urlparse
 from io import BytesIO
-import time 
+import datetime 
 from .convert_data import convert_and_store_ETagPairLive, convert_and_store_traffic_accident, convert_and_store_construction_zone
 from .db import database
 
@@ -22,22 +23,29 @@ class GetData:
         define all type of url and file name
         and call fetch_data() to get data
         """
-        ### begin of test ###
-        # url = "https://tisvcloud.freeway.gov.tw/history/motc20/ETag/20240302/ETagPairLive_2320.xml.gz"
-        # file_name = "ETagPairLive_2320.xml"
+        # url = "https://tisvcloud.freeway.gov.tw/history/motc20/ETag/20240301/ETagPairLive_0020.xml.gz"
+        # file_name = "ETagPairLive_0020.xml"
         # data_type = "ETagPairLive"
-        # self.__fetch_data(url, file_name, data_type, skip_exist=False, delete_file=False)
+        # self.__fetch_data(url, file_name, data_type, skip_exist=True, delete_file=False)
+        url = "https://freeway2024.tw/112%E5%B9%B41-10%E6%9C%88%E4%BA%A4%E9%80%9A%E4%BA%8B%E6%95%85%E7%B0%A1%E8%A8%8A%E9%80%9A%E5%A0%B1%E8%B3%87%E6%96%99.xlsx"
+        file_name = "112年1-10月交通事故簡訊通報狀況資料之分析資料.xlsx"
+        data_type = "traffic_accident"
+        self.__fetch_data(url, file_name, data_type, skip_exist=True, delete_file=False)
 
-        # url = "https://freeway2024.tw/112%E5%B9%B41-10%E6%9C%88%E4%BA%A4%E9%80%9A%E4%BA%8B%E6%95%85%E7%B0%A1%E8%A8%8A%E9%80%9A%E5%A0%B1%E8%B3%87%E6%96%99.xlsx"
-        # file_name = "112年1-10月及113年1-2月交通事故簡訊通報狀況資料之分析資料.xlsx"
-        # data_type = "traffic_accident"
-        # self.__fetch_data(url, file_name, data_type, skip_exist=False, delete_file=False)
+        url = "https://freeway2024.tw/113%E5%B9%B41-2%E6%9C%88%E4%BA%A4%E9%80%9A%E4%BA%8B%E6%95%85%E7%B0%A1%E8%A8%8A%E9%80%9A%E5%A0%B1%E8%B3%87%E6%96%99.xlsx"
+        file_name = "113年1-2月交通事故簡訊通報狀況資料之驗證資料.xlsx"
+        data_type = "traffic_accident"
+        self.__fetch_data(url, file_name, data_type, skip_exist=True, delete_file=False)
 
-        # url = "https://freeway2024.tw/112%E5%B9%B41-10%E6%9C%88%E9%81%93%E8%B7%AF%E6%96%BD%E5%B7%A5%E8%B7%AF%E6%AE%B5%E8%B3%87%E6%96%99.xlsx"
-        # file_name = "112年1-10月及113年1-2月施工路段資料之分析資料.xlsx"
-        # data_type = "construction_zone"
-        # self.__fetch_data(url, file_name, data_type, skip_exist=False, delete_file=False)
-        ### end of test ###
+        url = "https://freeway2024.tw/112%E5%B9%B41-10%E6%9C%88%E9%81%93%E8%B7%AF%E6%96%BD%E5%B7%A5%E8%B7%AF%E6%AE%B5%E8%B3%87%E6%96%99.xlsx"
+        file_name = "112年1-10月施工路段資料之分析資料.xlsx"
+        data_type = "construction_zone"
+        self.__fetch_data(url, file_name, data_type, skip_exist=True, delete_file=False)
+
+        url = "https://freeway2024.tw/113%E5%B9%B41-2%E6%9C%88%E6%96%BD%E5%B7%A5%E8%B7%AF%E6%AE%B5%E8%B3%87%E6%96%99.xlsx"
+        file_name = "113年1-2月施工路段資料之驗證資料.xlsx"
+        data_type = "construction_zone"
+        self.__fetch_data(url, file_name, data_type, skip_exist=True, delete_file=False)
 
         self.__fetch_all_ETagPairLive()
 
@@ -132,21 +140,29 @@ class GetData:
             print("The file does not exist, file path is " + store_path)
 
     def __fetch_all_ETagPairLive(self):
-        days = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+        ## 112年1月1號得資料在2023/0101/0025
+        ## 112年10月31號得資料在2023/1101/0020
+        ## 113年1月1號得資料在2024/0101/0025
+        ## 113年2月28號得資料在2024/0301/0020
+        # self.__fetch_ETagPairLive(2023, 1, 1, 0, 25, 2023, 11, 1, 0, 20)
+        # self.__fetch_ETagPairLive(2024, 1, 1, 0, 25, 2024, 3, 1, 0, 20)
+
+        self.__fetch_ETagPairLive(2023, 1, 1, 0, 25, 2023, 1, 1, 0, 25)
+        self.__fetch_ETagPairLive(2023, 11, 1, 0, 20, 2023, 11, 1, 0, 20)
+        self.__fetch_ETagPairLive(2024, 1, 1, 0, 25, 2024, 1, 1, 0, 25)
+        self.__fetch_ETagPairLive(2024, 3, 1, 0, 20, 2024, 3, 1, 0, 20)
+
+    def __fetch_ETagPairLive(self, begin_year, begin_month, begin_day, begin_hour, begin_min, end_year, end_month, end_day, end_hour, end_min):
         data_type = "ETagPairLive"
-        os.makedirs(self.__get_path ('assets/ETag/2023/'), exist_ok=True)
-        for month in range(1, 11) :
-            url_month = "https://tisvcloud.freeway.gov.tw/history/motc20/ETag/2023" + '{:02}'.format(month)
-            os.makedirs(self.__get_path ('assets/ETag/2023/' + '{:02}'.format(month)), exist_ok=True)
-            for day in range(1, days[month-1]+1) :
-                addition_path = "ETag/2023" + "/" + '{:02}'.format(month) + '/' + '{:02}'.format(day)
-                url_day = url_month + '{:02}'.format(day) + "/"
-                os.makedirs(self.__get_path ('assets/ETag/2023/' + '{:02}'.format(month) + '/' + '{:02}'.format(day)), exist_ok=True)
-                for hour in range(0, 24) :
-                    for min in range(0, 60, 5) :
-                        file_name = "ETagPairLive_" + '{:02}'.format(hour) + '{:02}'.format(min) + ".xml"
-                        url = url_day + file_name + ".gz"
-                        self.__fetch_data(url, file_name, data_type, addition_path=addition_path, skip_exist=True)
+        addition_path = "ETag" 
+        os.makedirs(self.__get_path ('assets/ETag/' + str(begin_year) + '/'), exist_ok=True)
+        current_time = datetime.datetime(begin_year, begin_month, begin_day, begin_hour, begin_min)
+        end_time = datetime.datetime(end_year, end_month, end_day, end_hour, end_min)
+        while current_time <= end_time:
+            file_name = "ETagPairLive_" + str(begin_year) + '_' + '{:02}'.format(current_time.month) + '{:02}'.format(current_time.day) + '_' + '{:02}'.format(current_time.hour) + '{:02}'.format(current_time.minute) + ".xml"
+            url = "https://tisvcloud.freeway.gov.tw/history/motc20/ETag/" + str(begin_year) + '{:02}'.format(current_time.month) + '{:02}'.format(current_time.day) + '/' + "ETagPairLive_" + '{:02}'.format(current_time.hour) + '{:02}'.format(current_time.minute) + ".xml.gz"
+            self.__fetch_data(url, file_name, data_type, addition_path=addition_path, skip_exist=True)
+            current_time = current_time + datetime.timedelta(minutes=5)
 
     def __check_gotton(self, store_path, file_name):
         if os.path.exists(store_path):
