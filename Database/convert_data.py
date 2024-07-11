@@ -68,7 +68,6 @@ def convert_and_store_ETagPairLive(store_path, conn):
 
     conn.db.commit()
     print("Data successfully inserted into the SQLite3 database.")
-    time.sleep(1)
     ###結束###
 
 def convert_and_store_traffic_accident(store_path, conn):
