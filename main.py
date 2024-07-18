@@ -1,8 +1,8 @@
-from Database import GetData
+from Database import Preprocess
 import os
 
 if __name__ == "__main__":
-    gd = GetData()
+    preprocess = Preprocess()
     
 
     
