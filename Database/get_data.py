@@ -11,22 +11,29 @@ from .convert_data import convert_and_store_ETagPairLive, convert_and_store_traf
 from .db import database
 
 class GetData:
-    def __init__(self):
+    """
+    Getting all data needed for internet, and save in a db.
+    Need to write custom function in "convert_data.py" and some specs in here for new data source.
+    """
+    def __init__(self, db_name='row.db'):
         os.makedirs(self.__get_path ('assets/'), exist_ok=True)
         self.__data_types = ["ETagPairLive", "traffic_accident", "construction_zone"]
-        self.Database = database(file_name = 'row_data.db')
+        self.Database = database(file_name = db_name)
         self.__fetch_all_data()
 
-    # not finish yet 
+    def get_db_name(self):
+        return self.Database.get_db_name()
+    
+    # warning comments
     def __fetch_all_data(self):
         """
         define all type of url and file name
         and call fetch_data() to get data
         """
-        # url = "https://tisvcloud.freeway.gov.tw/history/motc20/ETag/20240301/ETagPairLive_0020.xml.gz"
-        # file_name = "ETagPairLive_0020.xml"
-        # data_type = "ETagPairLive"
-        # self.__fetch_data(url, file_name, data_type, skip_exist=True, delete_file=False)
+        url = "https://tisvcloud.freeway.gov.tw/history/motc20/ETag/20240301/ETagPairLive_0020.xml.gz"
+        file_name = "ETagPairLive_0020.xml"
+        data_type = "ETagPairLive"
+        self.__fetch_data(url, file_name, data_type, skip_exist=True, delete_file=False)
         url = "https://freeway2024.tw/112%E5%B9%B41-10%E6%9C%88%E4%BA%A4%E9%80%9A%E4%BA%8B%E6%95%85%E7%B0%A1%E8%A8%8A%E9%80%9A%E5%A0%B1%E8%B3%87%E6%96%99.xlsx"
         file_name = "112年1-10月交通事故簡訊通報狀況資料之分析資料.xlsx"
         data_type = "traffic_accident"
@@ -148,9 +155,9 @@ class GetData:
         # self.__fetch_ETagPairLive(2024, 1, 1, 0, 25, 2024, 3, 1, 0, 20)
 
         self.__fetch_ETagPairLive(2023, 1, 1, 0, 25, 2023, 1, 1, 0, 25)
-        self.__fetch_ETagPairLive(2023, 11, 1, 0, 20, 2023, 11, 1, 0, 20)
-        self.__fetch_ETagPairLive(2024, 1, 1, 0, 25, 2024, 1, 1, 0, 25)
-        self.__fetch_ETagPairLive(2024, 3, 1, 0, 20, 2024, 3, 1, 0, 20)
+        # self.__fetch_ETagPairLive(2023, 11, 1, 0, 20, 2023, 11, 1, 0, 20)
+        # self.__fetch_ETagPairLive(2024, 1, 1, 0, 25, 2024, 1, 1, 0, 25)
+        # self.__fetch_ETagPairLive(2024, 3, 1, 0, 20, 2024, 3, 1, 0, 20)
 
     def __fetch_ETagPairLive(self, begin_year, begin_month, begin_day, begin_hour, begin_min, end_year, end_month, end_day, end_hour, end_min):
         data_type = "ETagPairLive"
