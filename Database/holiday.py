@@ -3,6 +3,12 @@ import time
 import sklearn
 from datetime import datetime
 
+"""
+Purpose of this file :
+    For preprocess_data.py, to process the holiday and date information in the dataset.
+    Only focus on 2023 1-12 month, and  2024 1-3 month
+"""
+
 # a list for convenice in calculating which day it is in a year
 days = [0, 0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334]
 """
@@ -247,6 +253,52 @@ holiday[2] = [  0,
               336, 336, 336, 336, 336, 336, 336,
               336,   0,   0,   0,   0,   0,   0, 
                 0,   0,  48,  48,  48]
+
+# ETagLive : 2023-01-01T00:00:00+08:00
+# accident : 2023	2	9	19	21
+# Construction : 2023/1/1 7:45
+# function format : YYYY-MM-DDTHH:MM:SS...
+
+def modified_holiday_and_date_cosine_processor(year, month, day, five_minute):
+    '''
+    Given a valid time, return whether it is holiday or weekend, and its value after cosine transformation
+
+    input:
+        year, month, day, five_minute
+    
+    output:
+        is_weekend: a boolean
+        is_holiday: a boolean
+        holiday:    a float represent its value in holiday after sine transformation (resolution is hour), 
+                    if the time does not have to do sine transformation, return 1
+        month:      a float represent its value in a year after sine transformation (resolution is month)
+        day:        a float represent its value in a year after sine transformation (resolution is day)
+        minute:     a float represent its value in a day after sine transformation (resolution is 5 minute)
+    '''
+
+    is_holiday = False
+    is_weekend = False
+    _holiday = 0.0
+
+    date_time = datetime(year, month, day, five_minute // 12, (five_minute % 12) * 5)
+    date = days[date_time.month] + date_time.day
+    index = (date_time.year - 2023) * 365 + date
+
+    if holiday[0][index] == 1:
+        is_holiday = True
+    elif holiday[0][index] == 2:
+        is_weekend = True
+    
+    month = np.cos(2 * np.pi * (date_time.month / 12))
+    day = np.cos(2 * np.pi * (date / 365))
+    minute = np.cos(2 * np.pi * ((date_time.hour * 12 + date_time.minute / 5) / 288))
+
+    # deal with 'no sine transformation value' scenario
+    if holiday[2][index] == 0 or holiday[1][index] + date_time.hour <= 0 or holiday[1][index] + date_time.hour >= holiday[2][index]:
+        return is_weekend, is_holiday, _holiday, month, day, minute
+    
+    _holiday = np.cos(2 * np.pi * ((holiday[1][index] + date_time.hour) / holiday[2][index]))
+    return is_weekend, is_holiday, _holiday, month, day, minute
 
 def holiday_and_date_sine_processor(start_time):
     '''
