@@ -10,11 +10,18 @@ import datetime
 from .convert_data import convert_and_store_ETagPairLive, convert_and_store_traffic_accident, convert_and_store_construction_zone
 from .db import database
 
-class GetData:
-    """
-    Getting all data needed for internet, and save in a db.
+"""
+Purpose of the file :
+    Getting all data needed from internet, and save unpreprocessed data in db (default name is row.db).
     Need to write custom function in "convert_data.py" and some specs in here for new data source.
-    """
+    Specs for new data source:
+        * __init__ : define data_type
+        * __fetch_all_data  :define url, file_name, data_type
+        * __process_and_store_data : call functions from convert_data.py for certain data_type
+    Core sub-function : __fetch_data
+"""
+
+class GetData:
     def __init__(self, db_name='row.db'):
         os.makedirs(self.__get_path ('assets/'), exist_ok=True)
         self.__data_types = ["ETagPairLive", "traffic_accident", "construction_zone"]
@@ -55,8 +62,9 @@ class GetData:
         self.__fetch_data(url, file_name, data_type, skip_exist=True, delete_file=False)
 
         self.__fetch_all_ETagPairLive()
+        # end of fetch_all_data function
 
-    # not finish yet 
+    # main sub-function
     def __fetch_data(self, url, file_name, data_type, addition_path="", skip_exist=True, delete_file=True):
         """
         get one data and process it from url
@@ -146,6 +154,7 @@ class GetData:
         else:
             print("The file does not exist, file path is " + store_path)
 
+    # warning comments
     def __fetch_all_ETagPairLive(self):
         ## 112年1月1號得資料在2023/0101/0025
         ## 112年10月31號得資料在2023/1101/0020
@@ -155,6 +164,7 @@ class GetData:
         # self.__fetch_ETagPairLive(2024, 1, 1, 0, 25, 2024, 3, 1, 0, 20)
 
         self.__fetch_ETagPairLive(2023, 1, 1, 0, 25, 2023, 1, 1, 0, 25)
+        self.__fetch_ETagPairLive(2023, 1, 1, 8, 00, 2023, 1, 1, 9, 00)
         # self.__fetch_ETagPairLive(2023, 11, 1, 0, 20, 2023, 11, 1, 0, 20)
         # self.__fetch_ETagPairLive(2024, 1, 1, 0, 25, 2024, 1, 1, 0, 25)
         # self.__fetch_ETagPairLive(2024, 3, 1, 0, 20, 2024, 3, 1, 0, 20)
