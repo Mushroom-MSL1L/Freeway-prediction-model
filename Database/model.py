@@ -3,7 +3,7 @@ import pandas as pd
 import joblib
 
 from sklearn.inspection import permutation_importance
-from sklearn.datasets import load_iris
+from sklearn.datasets import load_diabetes
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
@@ -20,8 +20,8 @@ def train(x, y, _test_size=0.2, _random_split=True, _n_estimators=100, _max_dept
         y: outcome
 
         dataset parameters:
-            _test_size:   a float between 0 and 1 to indicate the ratio of test dataset
-            _random_split: a boolean 
+            _test_size:    a float between 0 and 1 to indicate the ratio of test dataset
+            _random_split: a boolean indicate whether dataset is split
         
         model parameters:
             _n_estimator:      an integer indicate the number of decision tree in random forest
@@ -69,9 +69,9 @@ if __name__ == "__main__":
     """
     run "python model.py" to test model training function with example dataset
     """
-    iris = load_iris()
-    x = pd.DataFrame(iris.data, columns=iris.feature_names)
-    y = iris.target
+    diabete = load_diabetes()
+    x = pd.DataFrame(diabete.data, columns=diabete.feature_names)
+    y = diabete.target
 
     print("testing training model...")
     train(x, y, _random_split=False)
