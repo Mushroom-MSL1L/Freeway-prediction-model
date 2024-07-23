@@ -8,7 +8,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 
-def train(x, y, _test_size=0.2, _random_split=True, _n_estimators=100, _max_depth=None, _min_samples_leaf=1, import_model=False, save_model=True):
+def train(x, y, _test_size=0.2, _random_split=True, _n_estimators=100, _max_features=None, _max_depth=None, _min_samples_leaf=1, import_model=False, save_model=True):
     """
     train the model
 
@@ -21,13 +21,15 @@ def train(x, y, _test_size=0.2, _random_split=True, _n_estimators=100, _max_dept
 
         dataset parameters:
             _test_size:    a float between 0 and 1 to indicate the ratio of test dataset
-            _random_split: a boolean indicate whether dataset is split
+            _random_split: a boolean indicate whether dataset is split randomly into train and test dataset every time function is called
         
-        model parameters:
+        model parameters: 
             _n_estimator:      an integer indicate the number of decision tree in random forest
+            _max_features:     {'sqrt', 'log2', None}, an integer or a float, indicate the number of maximal features in a tree
             _max_depth:        an integer indicate the maximal depth of each decision tree in random forest
             _min_samples_leaf: an integer indicate the minimal number of sample in a leaf node
-        
+            *see https://scikit-learn.org/stable/modules/generated/sklearn.ensemble.RandomForestRegressor.html for detail
+            
         import_model: a boolean indicate whether model is from 'path' variable, or train a new model 
         save_model:   a boolean indicate whether model is saved to 'path' variable 
     """
@@ -42,7 +44,7 @@ def train(x, y, _test_size=0.2, _random_split=True, _n_estimators=100, _max_dept
         my_model = joblib.load(path)
         print("model imported")
     else:
-        my_model = RandomForestRegressor(n_estimators=_n_estimators, max_depth=_max_depth, min_samples_leaf=_min_samples_leaf)
+        my_model = RandomForestRegressor(n_estimators=_n_estimators, max_features=_max_features, max_depth=_max_depth, min_samples_leaf=_min_samples_leaf)
         my_model.fit(X_train, y_train)
 
     if save_model:
