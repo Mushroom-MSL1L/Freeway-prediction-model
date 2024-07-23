@@ -1,13 +1,15 @@
 import numpy as np
 import pandas as pd
 import eli5
-from eli5.sklearn import PermutationImportance
 import joblib
+
+from eli5.sklearn import PermutationImportance
+from sklearn.datasets import load_iris
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 
-def train(x, y, test_dataset_size=0.2, num_of_estimators=100, random_split=False, import_model=False, save_model=True):
+def train(x, y, _test_size=0.2, _n_estimators=100, _max_depth=None, _min_sample_leaf=1, import_model=False, save_model=True):
     """
     train the model
 
@@ -17,31 +19,20 @@ def train(x, y, test_dataset_size=0.2, num_of_estimators=100, random_split=False
     input:
         x: data used to predict outcome
         y: outcome
-        test_data_size: a float between 0 and 1 to indicate the ratio of test dataset
-        num_of_estimator: an integer indicate the number of decision tree in random forest
-        random_split: a boolean indicate whether test and train dataset should be randomly split every time
+        _test_size: a float between 0 and 1 to indicate the ratio of test dataset
+        _n_estimator: an integer indicate the number of decision tree in random forest
+        _max_depth
         import_model: a boolean indicate whether model is from 'path' variable, or train a new model 
         save_model: a boolean indicate whether model is saved to 'path' variable 
     """
-    state = 42
     path = "./random_forest.joblib"
-    
-    """
-    from sklearn.datasets import load_iris
-    iris = load_iris()
-    x = iris.data
-    y = iris.target
-    """
 
-    if random_split:
-        X_train, X_test, y_train, y_test = train_test_split(x, y, test_size=test_dataset_size)
-    else:
-        X_train, X_test, y_train, y_test = train_test_split(x, y, test_size=test_dataset_size, random_state=state)
+    X_train, X_test, y_train, y_test = train_test_split(x, y, test_size=_test_size)
 
     if import_model:
         my_model = joblib.load(path)
     else:
-        my_model = RandomForestRegressor(n_estimators=num_of_estimators, random_state=state)
+        my_model = RandomForestRegressor(n_estimators=_n_estimators, max_depth=_max_depth, min_samples_leaf=_min_sample_leaf)
         my_model.fit(X_train, y_train)
 
     if save_model:
@@ -55,3 +46,9 @@ def train(x, y, test_dataset_size=0.2, num_of_estimators=100, random_split=False
 
     performance = PermutationImportance(my_model, random_state=1).fit(X_test, y_test)
     eli5.show_weights(performance, feature_names=X_test.columns.tolist())
+
+
+if __name__ == "__main__":
+    iris = load_iris()
+    x = iris.data
+    y = iris.target
