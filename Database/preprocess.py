@@ -1,5 +1,4 @@
 from .get_data import GetData
-from .db import database
 from .holiday import modified_holiday_and_date_cosine_processor
 import pandas as pd
 import datetime
@@ -76,7 +75,7 @@ CREATE TABLE IF NOT EXISTS preprocessed_data (
 '''
         self.processed_db.cursor.execute(create_table_query)
         self.processed_db.db.commit()
-        print("\tTable created")
+        print("\tFinal table created")
         # end of __set_final_table function
 
 
@@ -162,6 +161,7 @@ CREATE TABLE IF NOT EXISTS preprocessed_data (
             4. store the preprocessed data as member variable Preprocess.df
     """
     def __load_ETagPairLive(self) :
+        print("\tETagPairLive is preprocessing.")
         load_ETagePair_query = '''
             SELECT *
             FROM ETagPairLive
@@ -177,7 +177,7 @@ CREATE TABLE IF NOT EXISTS preprocessed_data (
             'VehicleCount': 'sum'
         }).reset_index()
 
-        print("\tETagPairLive loaded")
+        print("\tETagPairLive is preprocessed and loaded.")
         self.df = df
         # end of __load_ETagPairLive function
 
@@ -207,6 +207,7 @@ CREATE TABLE IF NOT EXISTS preprocessed_data (
             7. store the preprocessed data as member variable Preprocess.df
     """
     def __load_traffic_accident(self) :
+        print("\tTrafficAccident is preprocessing.")
         def add_is_accident(row) :
             if row['RecoveryMinute'] == 0 :
                 return False
@@ -285,6 +286,7 @@ AND (
         self.df.to_sql('ETagPairLive_temp', self.processed_db.db, if_exists='replace', index=True)
         self.df = pd.read_sql_query(JOIN_query, self.processed_db.db)
         self.processed_db.db.execute(f"DROP TABLE IF EXISTS ETagPairLive_temp")
+        pd.set_option("future.no_silent_downcasting", True)
         self.df = self.df.fillna(0)
 
         # preprocess and store the data
@@ -294,11 +296,11 @@ AND (
         self.df['RecoveryMinute'] = self.df['RecoveryMinute'].astype(int)
 
         # print the result
-        pd.set_option('display.max_rows', None)
-        pd.set_option('display.max_columns', None)
-        result = self.df.query('is_accident == True')
-        print("result", result.head(100))
-        print("\tTrafficAccident loaded")
+        # pd.set_option('display.max_rows', None)
+        # pd.set_option('display.max_columns', None)
+        # result = self.df.query('is_accident == True')
+        # print("result", result.head(100))
+        print("\tTrafficAccident is preprocessed and loaded.")
         # end of __load_traffic_accident function
 
 
@@ -325,6 +327,7 @@ AND (
             9. print the result
     """
     def __load_construction_zone(self) :
+        print("\tConstruction zone is preprocessing.")
         def convert_to_sec(year, month, day, five_minute) :
             if year == 0 and month == 0 and day == 0 and five_minute == 0 :
                 return 0
@@ -403,29 +406,30 @@ AND ETagPairLive_temp.time BETWEEN construction_zone_temp.StartTime AND construc
 
         self.processed_db.db.execute(f"DROP TABLE IF EXISTS ETagPairLive_temp")
         self.processed_db.db.execute(f"DROP TABLE IF EXISTS construction_zone_temp")
-        self.df = self.df.fillna(0) 
+        pd.set_option("future.no_silent_downcasting", True)
+        self.df = self.df.fillna(0)
 
         # preprocess and store the data
         self.df['is_construction'] = self.df['ConstructionMinute'].apply(add_is_construction)
 
         # print the result
-        pd.set_option('display.max_rows', None)
-        pd.set_option('display.max_columns', None)
-        result = self.df.query('is_construction == True')
-        print("result", result.head(100))
-        print("\Construction zone loaded")
+        # pd.set_option('display.max_rows', None)
+        # pd.set_option('display.max_columns', None)
+        # result = self.df.query('is_construction == True')
+        # print("result", result.head(100))
+        print("\tConstruction zone is preprocessed and loaded.")
         # end of __load_construction_zone function
 
     def __load_holiday(self) :
-        print("columns : ", self.df.columns.to_list())
+        print("\tHoliday is preprocessing.")
+        # print("columns : ", self.df.columns.to_list())
         self.df['is_weekend'], self.df['is_holiday'], self.df['Holiday'], self.df['Month'], self.df['Day'], self.df['FiveMinute'] = zip(*self.df.apply(lambda row : modified_holiday_and_date_cosine_processor( row['Year'], row['Month'], row['Day'], row['FiveMinute']), axis=1))
         
-        print(self.df.head(10))
-        
-        print("\tHoliday loaded")
+        # print(self.df.head(10))
+        print("\tHoliday is preprocessed and loaded.")
         # end of __load_holiday function
 
     def store_preprocessed_data(self) :
         self.df.to_sql('preprocessed_data', self.processed_db.db, if_exists='replace', index=True)
-        print("\tPreprocessed data stored")
+        print("\tPreprocessed data stored.")
         # end of store_preprocessed_data function
