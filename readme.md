@@ -11,3 +11,5 @@
 # usage
 * ```cd``` to ```Freeway-prediction-model``` path of the project in terminal
 * run ```python main.py``` 
+* There will be a file named ```assets``` in Database folder, which contains the row data and preprocess data.
+    * If data is not collect correctly, please delete whole ```assets``` folder and run ```python main.py``` again.
