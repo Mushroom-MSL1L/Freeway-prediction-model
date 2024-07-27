@@ -48,8 +48,6 @@ def convert_and_store_ETagPairLive(store_path, conn):
         # end of parse_ETagPairID function 
 
     # set up 
-    print("\tProcess ETagPairLive data from file: ", store_path)
-    print("store_path: ", store_path)
     xml_data = open(store_path, 'rb').read() # read xml file as web data
     root = ET.fromstring(xml_data)
     c = conn.db.cursor()
@@ -129,7 +127,6 @@ def convert_and_store_ETagPairLive(store_path, conn):
             ''', (etag_pair_id, highway, start_mileage, end_mileage, direction, year, month, day, five_minute, vehicle_type, space_mean_speed, vehicle_count)
             )
     conn.db.commit()
-    print("Data successfully inserted into the SQLite3 database.")
     # end of convert_and_store_ETagPairLive function
 
 
@@ -237,7 +234,6 @@ def convert_and_store_traffic_accident(store_path, conn):
             return False
         # end of one_hot function
     
-    print("\tProcess traffic accident data from file: ", store_path)
     create_table_query = '''
     CREATE TABLE IF NOT EXISTS traffic_accident (
         ID              INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -303,8 +299,8 @@ def convert_and_store_traffic_accident(store_path, conn):
 
     # store data to database
     final_columns = ['Highway', 'Direction', 'Mileage', 'Year', 'Month', 'Day', 'FiveMinuteStart', 'RecoveryMinute', 'FiveMinuteEnd', '內路肩', '內車道', '中內車道', '中車道', '中外車道', '外車道', '外路肩', '匝道']
-    print(data_subset[final_columns].head())
-    print("columns name: ", data_subset.columns.to_list())
+    # print(data_subset[final_columns].head())
+    # print("columns name: ", data_subset.columns.to_list())
     data_subset[final_columns].to_sql('traffic_accident', conn.db, if_exists='replace', index=True)
 
     conn.db.commit()
@@ -427,7 +423,6 @@ def convert_and_store_construction_zone(store_path, conn):
         return start_mileage / 1000, end_mileage / 1000
         # end of handle_mileage function
     
-    print("\tProcess construction zone data from file: ", store_path)
     # create table
     create_table_query = '''
     CREATE TABLE IF NOT EXISTS construction_zone (
@@ -491,8 +486,8 @@ def convert_and_store_construction_zone(store_path, conn):
     
     # store data to database
     final_columns = ['StartYear', 'StartMonth', 'StartDay', 'StartFiveMinute', 'EndYear', 'EndMonth', 'EndDay', 'EndFiveMinute', 'Highway', 'Direction', 'StartMileage', 'EndMileage', '內側路肩', '第1車道', '第2車道', '第3車道', '第4車道', '第5車道', '第6車道', '第7車道', '第8車道', '外側路肩', '內邊坡', '外邊坡']
-    print(data_subset[final_columns].head())
-    print("columns name: ", data_subset.columns.to_list())
+    # print(data_subset[final_columns].head())
+    # print("columns name: ", data_subset.columns.to_list())
     data_subset[final_columns].to_sql('construction_zone', conn.db, if_exists='replace', index=True)
     
     conn.db.commit()
