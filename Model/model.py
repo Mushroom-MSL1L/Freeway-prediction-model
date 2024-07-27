@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import joblib
+import os
 
 from sklearn.inspection import permutation_importance
 from sklearn.datasets import load_diabetes
@@ -8,7 +9,13 @@ from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 
-def train(x, y, _test_size=0.2, _random_split=True, _n_estimators=100, _max_features=None, _max_depth=None, _min_samples_leaf=1, import_model=False, save_model=True):
+def get_path (file_name):
+    current_file_path = os.path.realpath(__file__)
+    current_dir_path = os.path.dirname(current_file_path)
+    file_path = os.path.join(current_dir_path, file_name)
+    return file_path
+
+def train(x, y, _test_size=0.2, _random_split=True, _n_estimators=100, _max_features=None, _max_depth=None, _min_samples_leaf=1, import_model=False, save_model=True, path=""):
     """
     train the model
 
@@ -33,7 +40,8 @@ def train(x, y, _test_size=0.2, _random_split=True, _n_estimators=100, _max_feat
         import_model: a boolean indicate whether model is from 'path' variable, or train a new model 
         save_model:   a boolean indicate whether model is saved to 'path' variable 
     """
-    path = "./random_forest.joblib"
+    os.makedirs(get_path ('models/'), exist_ok=True)
+    path = get_path ('models/' + path)
     
     if _random_split:
         X_train, X_test, y_train, y_test = train_test_split(x, y, test_size=_test_size)
@@ -41,8 +49,11 @@ def train(x, y, _test_size=0.2, _random_split=True, _n_estimators=100, _max_feat
         X_train, X_test, y_train, y_test = train_test_split(x, y, test_size=_test_size, random_state=1)
 
     if import_model:
-        my_model = joblib.load(path)
-        print("model imported")
+        try :
+            my_model = joblib.load(path)
+            print("model imported")
+        except:
+            raise ValueError("model not found")
     else:
         my_model = RandomForestRegressor(n_estimators=_n_estimators, max_features=_max_features, max_depth=_max_depth, min_samples_leaf=_min_samples_leaf)
         my_model.fit(X_train, y_train)
@@ -67,15 +78,16 @@ def train(x, y, _test_size=0.2, _random_split=True, _n_estimators=100, _max_feat
     print("--------------------end--------------------\n")
 
 
-if __name__ == "__main__":
+def test_model_with_diabetes():
     """
     run "python model.py" to test model training function with example dataset
     """
+    path = "random_forest.joblib"
     diabete = load_diabetes()
     x = pd.DataFrame(diabete.data, columns=diabete.feature_names)
     y = diabete.target
 
     print("testing training model...")
-    train(x, y, _random_split=False)
+    train(x, y, _random_split=False, import_model=False, save_model=True, path=path)
     print("testing importing model...")
-    train(x, y, _random_split=False, import_model=True, save_model=False)
+    train(x, y, _random_split=False, import_model=True, save_model=False, path=path)
