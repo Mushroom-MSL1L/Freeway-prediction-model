@@ -167,6 +167,7 @@ CREATE TABLE IF NOT EXISTS preprocessed_data (
             FROM ETagPairLive
         '''
         df = pd.read_sql_query(load_ETagePair_query, self.processed_db.db)
+        print("row ETagpairLive number : ", len(df)) # to be deleted
         # change vehicle type to the frequency
         df['VehicleType'] = df['VehicleType'].apply(lambda x : self.car_map[x])
         # aggregate same vehicle type
@@ -179,6 +180,7 @@ CREATE TABLE IF NOT EXISTS preprocessed_data (
 
         print("\tETagPairLive is preprocessed and loaded.")
         self.df = df
+        print("car frequency ETagpairLive number : ", len(df)) # to be deleted
         # end of __load_ETagPairLive function
 
 
@@ -301,6 +303,7 @@ AND (
         # result = self.df.query('is_accident == True')
         # print("result", result.head(100))
         print("\tTrafficAccident is preprocessed and loaded.")
+        print("traffic accident ETagpairLive number : ", len(self.df)) # to be deleted
         # end of __load_traffic_accident function
 
 
@@ -418,6 +421,7 @@ AND ETagPairLive_temp.time BETWEEN construction_zone_temp.StartTime AND construc
         # result = self.df.query('is_construction == True')
         # print("result", result.head(100))
         print("\tConstruction zone is preprocessed and loaded.")
+        print("construction zone ETagpairLive number : ", len(self.df)) # to be deleted
         # end of __load_construction_zone function
 
     def __load_holiday(self) :
@@ -427,6 +431,7 @@ AND ETagPairLive_temp.time BETWEEN construction_zone_temp.StartTime AND construc
         
         # print(self.df.head(10))
         print("\tHoliday is preprocessed and loaded.")
+        print("holiday ETagpairLive number : ", len(self.df)) # to be deleted
         # end of __load_holiday function
 
     def store_preprocessed_data(self) :
