@@ -332,10 +332,26 @@ AND (
     def __load_construction_zone(self) :
         print("\tConstruction zone is preprocessing.")
         def convert_to_sec(year, month, day, five_minute) :
-            if year == 0 and month == 0 and day == 0 and five_minute == 0 :
+            try:
+                if pd.isna(year) or pd.isna(month) or pd.isna(day) or pd.isna(five_minute):
+                    return 0
+                if year == 0 and month == 0 and day == 0 and five_minute == 0 :
+                    return 0
+                year, month, day, five_minute = int(year), int(month), int(day), int(five_minute)
+                if year < 0 or month < 1 or month > 12 or day < 1 or five_minute < 0 or five_minute >= 288:
+                    raise ValueError("Invalid date or time values")
+                hour = int(five_minute // 12)
+                minute = int((five_minute * 5) - (60 * hour))
+                time = datetime.datetime(year, month, day, hour, minute)
+                return time.timestamp()
+            except ValueError as e:
+                print(f"ValueError: {e}")
+                print(f"Problematic values - Year: {year}, Month: {month}, Day: {day}, FiveMinute: {five_minute}")
                 return 0
-            time = datetime.datetime(int(year), int(month), int(day), int(five_minute) // 12, (int(five_minute) % 12) * 5)
-            return time.timestamp()
+            except Exception as e:
+                print(f"Unexpected error: {e}")
+                print(f"Problematic time object: {time}")
+                return 0
         def add_is_construction(time) :
             if time == 0 :
                 return False
