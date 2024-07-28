@@ -168,11 +168,12 @@ class GetData:
         ## 112年10月31號得資料在2023/1101/0020
         ## 113年1月1號得資料在2024/0101/0025
         ## 113年2月28號得資料在2024/0301/0020
-        # self.__fetch_ETagPairLive(2023, 1, 1, 0, 25, 2023, 11, 1, 0, 20)
-        # self.__fetch_ETagPairLive(2024, 1, 1, 0, 25, 2024, 3, 1, 0, 20)
+        self.__fetch_ETagPairLive(2023, 1, 1, 0, 25, 2023, 11, 1, 0, 20)
+        self.__fetch_ETagPairLive(2024, 1, 1, 0, 25, 2024, 3, 1, 0, 20)
 
-        self.__fetch_ETagPairLive(2023, 1, 1, 0, 25, 2023, 1, 1, 0, 25, skip_exist, delete_file, show_delete)
-        self.__fetch_ETagPairLive(2023, 1, 1, 8, 00, 2023, 1, 1, 9, 00, skip_exist, delete_file, show_delete)
+        ## test data
+        # self.__fetch_ETagPairLive(2023, 1, 1, 0, 25, 2023, 1, 1, 0, 25, skip_exist, delete_file, show_delete)
+        # self.__fetch_ETagPairLive(2023, 1, 1, 8, 00, 2023, 1, 1, 9, 00, skip_exist, delete_file, show_delete)
         # self.__fetch_ETagPairLive(2023, 11, 1, 0, 20, 2023, 11, 1, 0, 20)
         # self.__fetch_ETagPairLive(2024, 1, 1, 0, 25, 2024, 1, 1, 0, 25)
         # self.__fetch_ETagPairLive(2024, 3, 1, 0, 20, 2024, 3, 1, 0, 20)
