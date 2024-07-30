@@ -23,21 +23,26 @@ Purpose of the file :
 """
 
 class GetData:
-    def __init__(self, db_name='row.db'):
+    def __init__(self, db_name='row.db', car_code_needed=[], segment_id_needed=[], already_fetched = False):
         os.makedirs(self.__get_path ('assets/'), exist_ok=True)
         self.__data_types = ["ETagPairLive", "traffic_accident", "construction_zone"]
+        self.car_code_needed = car_code_needed
+        self.segment_id_needed = segment_id_needed
         self.Database = database(file_name = db_name)
-        self.__fetch_all_data()
+        self.__fetch_all_data(already_fetched)
 
     def get_db_name(self):
         return self.Database.get_db_name()
     
     # warning comments
-    def __fetch_all_data(self):
+    def __fetch_all_data(self, already_fetched):
         """
         define all type of url and file name
         and call fetch_data() to get data
         """
+        if already_fetched:
+            print("\tAll data already fetched, skip fetching data from internet.")
+            return
         data_sources = [
             {
                 "file_name": "112年1-10月交通事故簡訊通報狀況資料之分析資料.xlsx", 
@@ -60,7 +65,9 @@ class GetData:
         for _, ds in enumerate(tqdm(data_sources, desc='fetch all data(except ETagPairLive)')):
             self.__fetch_data(ds['url'], ds['file_name'], ds['data_type'], skip_exist=True, delete_file=False)
 
-        self.__fetch_all_ETagPairLive(skip_exist=False, delete_file=True, show_delete=False)
+        if self.car_code_needed == []:
+            raise ValueError("car_code_needed is empty, should be a valid car code list")
+        self.__fetch_all_ETagPairLive(skip_exist=True, delete_file=True, show_delete=False)
         print("All data successfully inserted into the SQLite3 database.")
         # end of fetch_all_data function
 
@@ -140,7 +147,7 @@ class GetData:
         # process data here
         try:
             if data_type == "ETagPairLive":
-                convert_and_store_ETagPairLive(store_path, Database)
+                convert_and_store_ETagPairLive(store_path, Database, self.car_code_needed, self.segment_id_needed)
             elif data_type == "traffic_accident":
                 convert_and_store_traffic_accident(store_path, Database)
             elif data_type == "construction_zone":
@@ -168,15 +175,15 @@ class GetData:
         ## 112年10月31號得資料在2023/1101/0020
         ## 113年1月1號得資料在2024/0101/0025
         ## 113年2月28號得資料在2024/0301/0020
-        self.__fetch_ETagPairLive(2023, 1, 1, 0, 25, 2023, 11, 1, 0, 20)
-        self.__fetch_ETagPairLive(2024, 1, 1, 0, 25, 2024, 3, 1, 0, 20)
+        # self.__fetch_ETagPairLive(2023, 1, 1, 0, 25, 2023, 11, 1, 0, 20) # 112年主要資料
+        # self.__fetch_ETagPairLive(2024, 1, 1, 0, 25, 2024, 3, 1, 0, 20) # 113年主要資料
 
         ## test data
-        # self.__fetch_ETagPairLive(2023, 1, 1, 0, 25, 2023, 1, 1, 0, 25, skip_exist, delete_file, show_delete)
-        # self.__fetch_ETagPairLive(2023, 1, 1, 8, 00, 2023, 1, 1, 9, 00, skip_exist, delete_file, show_delete)
-        # self.__fetch_ETagPairLive(2023, 11, 1, 0, 20, 2023, 11, 1, 0, 20)
-        # self.__fetch_ETagPairLive(2024, 1, 1, 0, 25, 2024, 1, 1, 0, 25)
-        # self.__fetch_ETagPairLive(2024, 3, 1, 0, 20, 2024, 3, 1, 0, 20)
+        self.__fetch_ETagPairLive(2023, 1, 1, 0, 25, 2023, 1, 1, 0, 25, skip_exist, delete_file, show_delete)
+        self.__fetch_ETagPairLive(2023, 1, 1, 8, 00, 2023, 1, 1, 9, 00, skip_exist, delete_file, show_delete)
+        self.__fetch_ETagPairLive(2023, 11, 1, 0, 20, 2023, 11, 1, 0, 20)
+        self.__fetch_ETagPairLive(2024, 1, 1, 0, 25, 2024, 1, 1, 0, 25)
+        self.__fetch_ETagPairLive(2024, 3, 1, 0, 20, 2024, 3, 1, 0, 20)
 
     def __fetch_ETagPairLive(self, begin_year, begin_month, begin_day, begin_hour, begin_min, end_year, end_month, end_day, end_hour, end_min, skip_exist=True, delete_file=True, show_delete=False):
         def get_time_range (start_time, end_time):

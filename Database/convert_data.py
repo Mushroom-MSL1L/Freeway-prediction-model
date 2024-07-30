@@ -33,7 +33,7 @@ Purpose of this file:
             * process time to year, month, day, five_minute
         
 """
-def convert_and_store_ETagPairLive(store_path, conn):
+def convert_and_store_ETagPairLive(store_path, conn, car_code_needed, segment_id_needed_list):
     def parse_ETagPairID(input_str):
         input_str = str(input_str)
         match = re.match(r'(\d{2})([A-Z])(\d+)([A-Z])-(\d{2})([A-Z])(\d+)([A-Z])', input_str)
@@ -47,11 +47,14 @@ def convert_and_store_ETagPairLive(store_path, conn):
             return None, None, None, None
         # end of parse_ETagPairID function 
 
+    if car_code_needed is None or len(car_code_needed) == 0:
+        raise ValueError("car_code_needed is not defined or empty")
+    if segment_id_needed_list is None or len(segment_id_needed_list) == 0:
+        raise ValueError("segment_id_needed is not defined or empty")
     # set up 
     xml_data = open(store_path, 'rb').read() # read xml file as web data
     root = ET.fromstring(xml_data)
     c = conn.db.cursor()
-    car_code_needed = [31, 32, 41, 42, 5] # 31小客車 32小貨車 41大客車 42大貨車 5聯結車
 
     # create table
     c.execute('''
@@ -92,6 +95,11 @@ def convert_and_store_ETagPairLive(store_path, conn):
         if ((start_etag_status != 0) or (end_etag_status != 0)) :
             continue # two status should be normal 
 
+        # get segment id 
+        segment_ids = []
+        for segment_id_needed in segment_id_needed_list:
+            segment_ids.append(segment_id_needed["ID"])
+
         for flow in etag_pair_live.findall('.//{http://traffic.transportdata.tw/standard/traffic/schema/}Flow'):
             """ 
             xml Flow structure :
@@ -107,8 +115,10 @@ def convert_and_store_ETagPairLive(store_path, conn):
             space_mean_speed = int(flow.find('{http://traffic.transportdata.tw/standard/traffic/schema/}SpaceMeanSpeed').text)
             vehicle_count = int(flow.find('{http://traffic.transportdata.tw/standard/traffic/schema/}VehicleCount').text)
 
-            # drop uneeded vehicle type data 
+            # drop uneeded vehicle type data and segment id data
             if (vehicle_type not in car_code_needed) :
+                continue
+            if (etag_pair_id not in segment_ids) :
                 continue
             # process ETagPairID to highway, start_mileage, end_mileage, direction
             highway, start_mileage, end_mileage, direction = parse_ETagPairID(etag_pair_id)
