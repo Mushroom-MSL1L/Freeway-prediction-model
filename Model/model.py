@@ -10,10 +10,15 @@ from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 
 class Model:
-    def __init__(self):
-        pass
+    my_model=None
 
-    def train(self, x, y, _test_size=0.2, _random_split=True, _n_estimators=100, _max_features=None, _max_depth=None, _min_samples_leaf=1, import_model=False, save_model=True, path=""):
+    def __init__(self, x_train, y_train, x_test, y_test):
+        self.x_train = x_train
+        self.y_train = y_train
+        self.x_test = x_test
+        self.y_test = y_test
+
+    def train(self, _n_estimators=100, _max_features=None, _max_depth=None, _min_samples_leaf=1, import_model=False, save_model=True, path=""):
         """
         train the model
 
@@ -41,11 +46,6 @@ class Model:
         os.makedirs(self.__get_path ('models/'), exist_ok=True)
         path = self.__get_path ('models/' + path)
         
-        if _random_split:
-            X_train, X_test, y_train, y_test = train_test_split(x, y, test_size=_test_size)
-        else:
-            X_train, X_test, y_train, y_test = train_test_split(x, y, test_size=_test_size, random_state=1)
-
         if import_model:
             try :
                 my_model = joblib.load(path)
@@ -54,26 +54,11 @@ class Model:
                 raise ValueError("model not found")
         else:
             my_model = RandomForestRegressor(n_estimators=_n_estimators, max_features=_max_features, max_depth=_max_depth, min_samples_leaf=_min_samples_leaf)
-            my_model.fit(X_train, y_train)
+            self.my_model.fit(self.x_train, self.y_train)
 
         if save_model:
             joblib.dump(my_model, path)
             print("model saved, at ", path)
-        
-        y_pred = my_model.predict(X_test)
-        print("------------------Results------------------")
-        print("Mean Squared Error: ", mean_squared_error(y_test, y_pred))
-        print("Mean Absolute Error:", mean_absolute_error(y_test, y_pred))
-        print("R^2 Score:          ", r2_score(y_test, y_pred))
-        
-        print("------------Feature importances------------")
-        performance = permutation_importance(my_model, X_test, y_test, n_repeats=10, random_state=0)
-        for i in performance.importances_mean.argsort()[::-1]:
-            if performance.importances_mean[i] - 2 * performance.importances_std[i] > 0:
-                print(f"{x.columns[i]:<21}"
-                    f"{performance.importances_mean[i]:.3f}"
-                    f" +/- {performance.importances_std[i]:.3f}")
-        print("--------------------end--------------------\n")
 
     def __get_path (self, file_name):
         current_file_path = os.path.realpath(__file__)
@@ -94,3 +79,19 @@ class Model:
         self.train(x, y, _random_split=False, import_model=False, save_model=True, path=path)
         print("testing importing model...")
         self.train(x, y, _random_split=False, import_model=True, save_model=False, path=path)
+
+    def test(self):
+        y_pred = self.my_model.predict(self.x_test)
+        print("------------------Results------------------")
+        print("Mean Squared Error: ", mean_squared_error(self.y_test, y_pred))
+        print("Mean Absolute Error:", mean_absolute_error(self.y_test, y_pred))
+        print("R^2 Score:          ", r2_score(self.y_test, y_pred))
+        
+        print("------------Feature importances------------")
+        performance = permutation_importance(self.my_model, self.x_test, self.y_test, n_repeats=10, random_state=0)
+        for i in performance.importances_mean.argsort()[::-1]:
+            if performance.importances_mean[i] - 2 * performance.importances_std[i] > 0:
+                print(f"{x.columns[i]:<21}"
+                    f"{performance.importances_mean[i]:.3f}"
+                    f" +/- {performance.importances_std[i]:.3f}")
+        print("--------------------end--------------------\n")
