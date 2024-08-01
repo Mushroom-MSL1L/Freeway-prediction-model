@@ -175,16 +175,17 @@ class GetData:
         ## 112年10月31號得資料在2023/1101/0020
         ## 113年1月1號得資料在2024/0101/0025
         ## 113年2月28號得資料在2024/0301/0020
-        # self.__fetch_ETagPairLive(2023, 1, 1, 0, 25, 2023, 11, 1, 0, 20) # 112年主要資料
-        # self.__fetch_ETagPairLive(2024, 1, 1, 0, 25, 2024, 3, 1, 0, 20) # 113年主要資料
+        self.__fetch_ETagPairLive(2023, 1, 1, 0, 25, 2023, 11, 1, 0, 20) # 112年主要資料
+        self.__fetch_ETagPairLive(2024, 1, 1, 0, 25, 2024, 3, 1, 0, 20) # 113年主要資料
 
         ## test data
-        self.__fetch_ETagPairLive(2023, 7, 17, 7, 00, 2023, 7, 17, 8, 00, skip_exist, delete_file, show_exist, show_delete) # 01F0928N-01F0880N should have accident
-        self.__fetch_ETagPairLive(2023, 6, 28, 3, 40, 2023, 6, 28, 4, 40, skip_exist, delete_file, show_exist, show_delete) # 01F0928N-01F0880N should have construction
-        # self.__fetch_ETagPairLive(2023, 1, 1, 0, 25, 2023, 1, 1, 0, 25, skip_exist, delete_file, show_delete)
-        # self.__fetch_ETagPairLive(2023, 11, 1, 0, 20, 2023, 11, 1, 0, 20)
-        # self.__fetch_ETagPairLive(2024, 1, 1, 0, 25, 2024, 1, 1, 0, 25)
-        # self.__fetch_ETagPairLive(2024, 3, 1, 0, 20, 2024, 3, 1, 0, 20)
+        # self.__fetch_ETagPairLive(2023, 7, 17, 7, 00, 2023, 7, 17, 8, 00, skip_exist, delete_file, show_exist, show_delete) # 01F0928N-01F0880N should have accident
+        # self.__fetch_ETagPairLive(2023, 6, 28, 3, 40, 2023, 6, 28, 4, 40, skip_exist, delete_file, show_exist, show_delete) # 01F0928N-01F0880N should have construction
+        # self.__fetch_ETagPairLive(2023, 1, 1, 0, 25, 2023, 1, 20, 0, 20, skip_exist, delete_file, show_exist, show_delete) # 測試一段時間的資料
+        # self.__fetch_ETagPairLive(2023, 1, 1, 0, 25, 2023, 1, 1, 0, 25) # 112年1月1號得資料
+        # self.__fetch_ETagPairLive(2023, 11, 1, 0, 20, 2023, 11, 1, 0, 20) # 112年10月31號得資料
+        # self.__fetch_ETagPairLive(2024, 1, 1, 0, 25, 2024, 1, 1, 0, 25) # 113年1月1號得資料
+        # self.__fetch_ETagPairLive(2024, 3, 1, 0, 20, 2024, 3, 1, 0, 20) # 113年2月28號得資料
 
     def __fetch_ETagPairLive(self, begin_year, begin_month, begin_day, begin_hour, begin_min, end_year, end_month, end_day, end_hour, end_min, skip_exist=True, delete_file=True, show_exist=False, show_delete=False):
         def get_time_range (start_time, end_time):

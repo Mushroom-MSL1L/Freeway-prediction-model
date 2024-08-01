@@ -35,7 +35,10 @@ if __name__ == "__main__":
         {"ID" : "01F0980S-01F1045S", "from" : "新竹(科學工業園區)-新竹系統", "to" : "新竹系統-頭份"},
     ]
     car_code_needed = [31, 32, 41, 42, 5] # 31小客車 32小貨車 41大客車 42大貨車 5聯結車
-    preprocess_var = Preprocess(segment_id_needed, car_code_needed, already_fetched=True, already_preprocessed=False)
+    already_fetched         = False
+    already_preprocessed    = False
+    
+    preprocess_var = Preprocess(segment_id_needed, car_code_needed, already_fetched, already_preprocessed)
     preprocessed_data = preprocess_var.get_preprocessed_data()
     car_map = preprocess_var.get_car_map()
     print(preprocessed_data.head())
