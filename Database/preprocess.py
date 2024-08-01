@@ -1,7 +1,11 @@
 from .get_data import GetData
 from .holiday import modified_holiday_and_date_cosine_processor
+import modin.pandas as mpd
 import pandas as pd
-import datetime
+from tqdm import tqdm as tqdm
+import dask
+dask.config.set({'logging.distributed': 'error'})
+
 
 """
 Purpose of the file : 
@@ -13,74 +17,116 @@ Purpose of the file :
 """
 
 class Preprocess():
-    def __init__(self) : 
+    def __init__(self, segment_id_needed, car_code_needed, already_fetched=False, already_preprocessed=False) : 
         # main functions 
-        self.get_data = GetData(db_name='row.db')
+        self.segment_id_needed = self.set_segment_id_needed(segment_id_needed)
+        self.car_code_needed = self.set_car_code_needed(car_code_needed)
+        self.db_name = 'row.db'
+        self.df = mpd.DataFrame()
+        self.get_data = GetData(db_name=self.db_name, car_code_needed=self.car_code_needed, segment_id_needed=self.segment_id_needed, already_fetched=already_fetched)
         self.processed_db = self.get_data.Database
-        self.df = pd.DataFrame()
-        self.__set_final_table()
-        self.car_map = self.__get_car_frequency()
-        self.__load_ETagPairLive()
-        self.__load_traffic_accident()
-        self.__load_construction_zone()
-        self.__load_holiday()
-        self.store_preprocessed_data()
+        self.car_map = self.__get_car_frequency(already_preprocessed)
+        self.__preprocess_all_data(already_preprocessed)
 
     def get_preprocessed_data(self) :
+        query = '''
+            SELECT *
+            FROM preprocessed_data
+        '''
+        self.df = self.query_in_batches(query, self.processed_db.db)
         return self.df
 
-    def __set_final_table(self) :
-        create_table_query = '''
-CREATE TABLE IF NOT EXISTS preprocessed_data (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    direction char(1),
-    location TEXT,
-    car INTEGER,
-    speed FLOAT,
+    def get_car_map(self) :
+        return self.car_map
 
-    month FLOAT,
-    day FLOAT,
-    date FLOAT,
-    time FLOAT,
+    def batch_to_sql(self, df, table_name, conn, chunksize=10000):
+        for start in range(0, len(df), chunksize):
+            end = min(start + chunksize, len(df))
+            df_chunk = df.iloc[start:end]
+            df_chunk = df_chunk._to_pandas()
+            df_chunk.to_sql(table_name, conn, if_exists='append', index=False)
 
-    is_weekend BOOLEAN,
-    is_holiday BOOLEAN,
-    holiday FLOAT,
+    def query_in_batches(self, query, conn, batch_size=10000):
+        offset = 0
+        batch_dfs = []
+        while True:
+            batch_query = f"{query} LIMIT {batch_size} OFFSET {offset}"
+            batch_df = pd.read_sql_query(batch_query, conn)
+            if batch_df.empty:
+                break
+            batch_modin_df = mpd.DataFrame(batch_df)
+            
+            batch_dfs.append(batch_modin_df)
+            offset += batch_size
+        if batch_dfs:
+            full_modin_df = mpd.concat(batch_dfs, ignore_index=True)
+        else:
+            full_modin_df = mpd.DataFrame() 
+        return full_modin_df
 
-    has_accident BOOLEAN,
-    recovery_time INTEGER,
-    內路肩 BOOLEAN,
-    內車道 BOOLEAN,
-    中內車道 BOOLEAN,
-    中車道 BOOLEAN,
-    中外車道    BOOLEAN,
-    外車道  BOOLEAN,
-    外路肩  BOOLEAN,
-    匝道    BOOLEAN,
+    def set_segment_id_needed(self, segment_id_needed) :
+        keys = ['ID', 'from', 'to']
+        if type(segment_id_needed) != list : 
+            raise ValueError("segment_id_needed should be a list of dictionary")
+        for segment in segment_id_needed :
+            if type(segment) != dict :
+                raise ValueError("segment_id_needed element should be a dictionary")
+            for key in keys :
+                if key not in segment :
+                    raise ValueError(f"segment_id_needed should have key : {key}")
+        return segment_id_needed
 
-    has_construction BOOLEAN,
-    construction_time INTEGER,
-    第一車道 BOOLEAN,
-    第二車道 BOOLEAN,
-    第三車道 BOOLEAN,
-    第四車道 BOOLEAN,
-    第五車道 BOOLEAN,
-    第六車道 BOOLEAN,
-    第七車道 BOOLEAN,
-    第八車道 BOOLEAN,
-    外側路肩 BOOLEAN,
-    內邊坡 BOOLEAN,
-    外邊坡 BOOLEAN
-)
-'''
-        self.processed_db.cursor.execute(create_table_query)
-        self.processed_db.db.commit()
-        print("\tFinal table created")
-        # end of __set_final_table function
+    def set_car_code_needed(self, car_code_needed) :
+        if type(car_code_needed) != list :
+            raise ValueError("car_code_needed should be a list")
+        if len(car_code_needed) <= 0 :
+            raise ValueError("car_code_needed should have more than 0 elements")
+        return car_code_needed
 
+    def __preprocess_all_data(self, already_preprocessed = False) :
+        def get_UTC_range() :
+            query = '''
+                SELECT MIN(UTC) as min, MAX(UTC) as max
+                FROM ETagPairLive
+            '''
+            result = self.processed_db.cursor.execute(query).fetchone()
+            min_value, max_value = result
+            return min_value, max_value
+        # check if the preprocessed data already exists
+        if already_preprocessed:
+            try:
+                preprocessed_data_query = '''
+                    SELECT *
+                    FROM preprocessed_data
+                    limit 1
+                '''
+                one_df = mpd.DataFrame()
+                one_df = self.query_in_batches(preprocessed_data_query, self.processed_db.db)
+                self.df = one_df
+                print("\tPreprocessed data already fetched, skip preprocessing.")
+                return
+            except:
+                raise ValueError("Preprocessed data not found")
+        # begin of preprocessing
+        show_progress = False
+        min_UTC, max_UTC = get_UTC_range()
+        for _, segment in enumerate(tqdm(self.segment_id_needed, desc='Preprocessing all segment data……')) :
+            time_width = 86400 * 10 # 每次處理10天的資料
+            run_times = (max_UTC - min_UTC) // time_width + 1
+            current_min_UTC = min_UTC
+            current_max_UTC = min(min_UTC + time_width, max_UTC)
+            for _, _ in enumerate(tqdm(range(run_times), desc=f'Preprocessing segment data {segment["ID"]}')) :
+                temp_df = mpd.DataFrame()
+                temp_df = self.__load_ETagPairLive(segment['ID'], show_progress, current_min_UTC, current_max_UTC)
+                temp_df = self.__load_traffic_accident(segment['ID'], temp_df, show_progress)
+                temp_df = self.__load_construction_zone(segment['ID'], temp_df, show_progress)
+                temp_df = self.__load_holiday(segment['ID'], temp_df, show_progress)
+                self.store_preprocessed_data(segment['ID'], temp_df)
+                current_min_UTC = current_max_UTC + 60 * 5 # 加上5分鐘
+                current_max_UTC = min(current_min_UTC + time_width, max_UTC)
+        print("\tPreprocessed data stored.")
 
-
-
+### warning : here need to specify the car_code_needed and car groups
     """
     "__get_car_frequency" : 
             Calculate the frequency of certain car type from ETagPairLive of 2023 (train data)
@@ -99,28 +145,50 @@ CREATE TABLE IF NOT EXISTS preprocessed_data (
             4. store the frequency in the database
             5. return the frequency as Preprocess.car_map dictionary
     """
-    def __get_car_frequency(self) :
+    def __get_car_frequency(self, already_preprocessed = False) :
+        if already_preprocessed:
+            try: 
+                car_encode_map = {}
+                car_frequency_query = '''
+                    SELECT CarCode, Frequency
+                    FROM CarFrequency
+                '''
+                car_frequency = self.query_in_batches(car_frequency_query, self.processed_db.db)
+                for index, row in car_frequency.iterrows():
+                    car_encode_map[int(row['CarCode'])] = float(row['Frequency'])
+                print("\tCar frequency already fetched, skip fetching from database.")
+                return car_encode_map
+            except:
+                raise ValueError("Car frequency not found")
+        
         # get the car numbers from the database
         # only in 2023, 102
         count_car_number_query = '''
-            SELECT VehicleType, SUM(VehicleCount)
+            SELECT VehicleType, SUM(VehicleCount) as TotalCar
             FROM ETagPairLive
             WHERE Year = 2023
             GROUP BY VehicleType
         '''
-        car_code_needed = [31, 32, 41, 42, 5] # 31小客車 32小貨車 41大客車 42大貨車 5聯結車
-        car_amount = self.processed_db.cursor.execute(count_car_number_query).fetchall()
 
-        total_car = sum([car[1] for car in car_amount])
-        car_type_map = {31: 0, 32: 0, 41: 1, 42: 1, 5: 2} # 0小型車 1:大型車 2:其他
+        car_amount = self.query_in_batches(count_car_number_query, self.processed_db.db)
+        car_code_needed = self.car_code_needed
+        total_car = car_amount['TotalCar'].sum()
+        car_type_map = {31: 0, 32: 0, 41: 1, 42: 1, 5: 2}  # 0: 小型車, 1: 大型車, 2: 其他
         car_encode_map = {31: 0, 32: 0, 41: 0, 42: 0, 5: 0}
         car_frequency = [0, 0, 0]
-        for car in car_amount :
-            if car[0] in car_code_needed :
-                car_frequency[car_type_map[car[0]]] += car[1] / total_car
-        for car in car_amount :
-            if car[0] in car_code_needed :
-                car_encode_map[car[0]] = round(car_frequency[car_type_map[car[0]]], 3)
+
+        # Calculate frequency
+        for index, row in car_amount.iterrows():
+            car_code = row['VehicleType'] 
+            car_count = row['TotalCar']
+            if car_code in car_code_needed:
+                car_frequency[car_type_map[car_code]] += car_count / total_car
+
+        # Encode the frequency
+        for index, row in car_amount.iterrows():
+            car_code = row['VehicleType']
+            if car_code in car_code_needed:
+                car_encode_map[int(car_code)] = round(float(car_frequency[car_type_map[car_code]]), 3)
         print("\tCar frequency fetched")
 
         # create the table
@@ -143,8 +211,6 @@ CREATE TABLE IF NOT EXISTS preprocessed_data (
         return car_encode_map
         # end of __get_car_frequency function
 
-
-
     """
     "__load_ETagPairLive" :
             Load the ETagPairLive data from the database
@@ -160,27 +226,38 @@ CREATE TABLE IF NOT EXISTS preprocessed_data (
             3. aggregate the same vehicle type
             4. store the preprocessed data as member variable Preprocess.df
     """
-    def __load_ETagPairLive(self) :
-        print("\tETagPairLive is preprocessing.")
-        load_ETagePair_query = '''
+    def __load_ETagPairLive(self, segment_id, show_progress=True, min_UTC=0, max_UTC=0) :
+        # exception handling
+        if show_progress:
+            print("\tETagPairLive is preprocessing.")
+        if min_UTC == 0 or max_UTC == 0:
+            raise ValueError("min_UTC and max_UTC should be specified")
+        
+        # load the ETagPairLive data
+        load_ETagePair_query = f'''
             SELECT *
             FROM ETagPairLive
+            WHERE ETagPairID = '{segment_id}'
+            AND UTC BETWEEN {min_UTC} AND {max_UTC}
         '''
-        df = pd.read_sql_query(load_ETagePair_query, self.processed_db.db)
-        print("row ETagpairLive number : ", len(df)) # to be deleted
+        def map_vehicle_type(row, car_map):
+            return car_map[row['VehicleType']]
+
+        df = self.query_in_batches(load_ETagePair_query, self.processed_db.db)
         # change vehicle type to the frequency
-        df['VehicleType'] = df['VehicleType'].apply(lambda x : self.car_map[x])
+        df['VehicleType'] = df.apply(map_vehicle_type, car_map=self.car_map, axis=1)
+
         # aggregate same vehicle type
         df = df.groupby([
-            'ETagPairID', 'Highway', 'StartMileage', 'EndMileage', 'Direction', 'Year', 'Month', 'Day', 'FiveMinute', 'VehicleType'
+            'ETagPairID', 'Highway', 'StartMileage', 'EndMileage', 'Direction', 'UTC', 'Year', 'Month', 'Day', 'FiveMinute', 'VehicleType'
         ]).agg({
             'SpaceMeanSpeed': 'mean',
             'VehicleCount': 'sum'
         }).reset_index()
 
-        print("\tETagPairLive is preprocessed and loaded.")
-        self.df = df
-        print("car frequency ETagpairLive number : ", len(df)) # to be deleted
+        if show_progress:
+            print("\tETagPairLive is preprocessed and loaded.")
+        return df
         # end of __load_ETagPairLive function
 
 
@@ -208,18 +285,9 @@ CREATE TABLE IF NOT EXISTS preprocessed_data (
             6. change the columns to boolean type
             7. store the preprocessed data as member variable Preprocess.df
     """
-    def __load_traffic_accident(self) :
-        print("\tTrafficAccident is preprocessing.")
-        def add_is_accident(row) :
-            if row['RecoveryMinute'] == 0 :
-                return False
-            return True
-        # traffic_accident direction in middle of ETag
-        # ETag time in middle of traffic_accident
-        # three cases
-        ## same day
-        ## cross a day and in the previous day
-        ## cross a day and in the next day
+    def __load_traffic_accident(self, segment_id, temp_df, show_progress=True) :
+        if show_progress:
+            print("\tTrafficAccident is preprocessing.")
         JOIN_query = '''
 SELECT 
     ETagPairLive_temp.ETagPairID, 
@@ -227,6 +295,7 @@ SELECT
     ETagPairLive_temp.StartMileage, 
     ETagPairLive_temp.EndMileage, 
     ETagPairLive_temp.Direction, 
+    ETagPairLive_temp.UTC,
     ETagPairLive_temp.Year, 
     ETagPairLive_temp.Month, 
     ETagPairLive_temp.Day, 
@@ -234,6 +303,16 @@ SELECT
     ETagPairLive_temp.VehicleType, 
     ETagPairLive_temp.SpaceMeanSpeed, 
     ETagPairLive_temp.VehicleCount,
+
+    traffic_accident.StartUTC AS accident_StartUTC,
+    traffic_accident.EndUTC AS accident_EndUTC,
+    traffic_accident.Year AS accident_Year,
+    traffic_accident.Month AS accident_Month,
+    traffic_accident.Day AS accident_Day,
+    traffic_accident.Highway AS accident_Highway,
+    traffic_accident.Direction AS accident_Direction,
+    traffic_accident.Mileage AS accident_Mileage,
+
     traffic_accident.RecoveryMinute,
     traffic_accident.內路肩,
     traffic_accident.內車道,
@@ -242,68 +321,32 @@ SELECT
     traffic_accident.中外車道,
     traffic_accident.外車道,
     traffic_accident.外路肩,
-    traffic_accident.匝道,
-
-    traffic_accident.Year AS accident_Year,
-    traffic_accident.Month AS accident_Month,
-    traffic_accident.Day AS accident_Day,
-    traffic_accident.FiveMinuteStart,
-    traffic_accident.FiveMinuteEnd
-
+    traffic_accident.匝道
 
 FROM ETagPairLive_temp
 LEFT JOIN traffic_accident
 ON ETagPairLive_temp.Highway = traffic_accident.Highway
 AND ETagPairLive_temp.Direction = traffic_accident.Direction
-AND traffic_accident.Mileage BETWEEN ETagPairLive_temp.StartMileage AND ETagPairLive_temp.EndMileage
-AND ETagPairLive_temp.Year = traffic_accident.Year
-AND ETagPairLive_temp.Month = traffic_accident.Month
-AND ETagPairLive_temp.Day = traffic_accident.Day
 AND (
-    (
-        ETagPairLive_temp.Year = traffic_accident.Year
-        AND ETagPairLive_temp.Month = traffic_accident.Month
-        AND ETagPairLive_temp.Day = traffic_accident.Day
-        AND ETagPairLive_temp.FiveMinute BETWEEN traffic_accident.FiveMinuteStart AND traffic_accident.FiveMinuteEnd
-    )
-    OR 
-    (
-        ETagPairLive_temp.Year = traffic_accident.Year
-        AND ETagPairLive_temp.Month = traffic_accident.Month
-        AND ETagPairLive_temp.Day = traffic_accident.Day
-        AND traffic_accident.RecoveryMinute IS NOT NULL
-        AND ETagPairLive_temp.FiveMinute BETWEEN traffic_accident.FiveMinuteStart AND (traffic_accident.FiveMinuteStart + traffic_accident.RecoveryMinute / 5)
-    )
+    (traffic_accident.Mileage BETWEEN ETagPairLive_temp.StartMileage AND ETagPairLive_temp.EndMileage)
     OR
-    (
-        ETagPairLive_temp.Year = traffic_accident.Year
-        AND ETagPairLive_temp.Month = traffic_accident.Month
-        AND ETagPairLive_temp.Day = traffic_accident.Day + 1
-        AND traffic_accident.RecoveryMinute IS NOT NULL
-        AND ETagPairLive_temp.FiveMinute <= (traffic_accident.FiveMinuteStart + traffic_accident.RecoveryMinute / 5 - 288)
-    )
+    (traffic_accident.Mileage BETWEEN ETagPairLive_temp.EndMileage AND ETagPairLive_temp.StartMileage)
 )
+AND ETagPairLive_temp.Year = traffic_accident.Year
+AND ETagPairLive_temp.UTC BETWEEN traffic_accident.StartUTC AND traffic_accident.EndUTC
 '''
         # join the ETagPairLive and traffic_accident
-        self.df.to_sql('ETagPairLive_temp', self.processed_db.db, if_exists='replace', index=True)
-        self.df = pd.read_sql_query(JOIN_query, self.processed_db.db)
-        self.processed_db.db.execute(f"DROP TABLE IF EXISTS ETagPairLive_temp")
-        pd.set_option("future.no_silent_downcasting", True)
-        self.df = self.df.fillna(0)
+        self.batch_to_sql(temp_df, 'ETagPairLive_temp', self.processed_db.db)
+        temp_df = self.query_in_batches(JOIN_query, self.processed_db.db)
+        self.processed_db.db.execute(f"DROP TABLE IF EXISTS ETagPairLive_temp") 
+        mpd.set_option("future.no_silent_downcasting", True)
+        temp_df = temp_df.fillna(0)
 
         # preprocess and store the data
-        self.df['is_accident'] = self.df.apply(add_is_accident, axis=1)
-        columns_need_to_be_boolean = ['內路肩', '內車道', '中內車道', '中車道', '中外車道', '外車道', '外路肩', '匝道']
-        self.df[columns_need_to_be_boolean] = self.df[columns_need_to_be_boolean].astype(bool)
-        self.df['RecoveryMinute'] = self.df['RecoveryMinute'].astype(int)
-
-        # print the result
-        # pd.set_option('display.max_rows', None)
-        # pd.set_option('display.max_columns', None)
-        # result = self.df.query('is_accident == True')
-        # print("result", result.head(100))
-        print("\tTrafficAccident is preprocessed and loaded.")
-        print("traffic accident ETagpairLive number : ", len(self.df)) # to be deleted
+        temp_df['is_accident'] = temp_df['RecoveryMinute'] != 0
+        if show_progress:
+            print("\tTrafficAccident is preprocessed and loaded.")
+        return temp_df
         # end of __load_traffic_accident function
 
 
@@ -329,29 +372,9 @@ AND (
             8. store the preprocessed data as member variable Preprocess.df 
             9. print the result
     """
-    def __load_construction_zone(self) :
-        print("\tConstruction zone is preprocessing.")
-        def convert_to_sec(year, month, day, five_minute) :
-            try:
-                if pd.isna(year) or pd.isna(month) or pd.isna(day) or pd.isna(five_minute):
-                    return 0
-                if year == 0 and month == 0 and day == 0 and five_minute == 0 :
-                    return 0
-                year, month, day, five_minute = int(year), int(month), int(day), int(five_minute)
-                if year < 0 or month < 1 or month > 12 or day < 1 or five_minute < 0 or five_minute >= 288:
-                    raise ValueError("Invalid date or time values")
-                hour = int(five_minute // 12)
-                minute = int((five_minute * 5) - (60 * hour))
-                time = datetime.datetime(year, month, day, hour, minute)
-                return time.timestamp()
-            except ValueError as e:
-                print(f"ValueError: {e}")
-                print(f"Problematic values - Year: {year}, Month: {month}, Day: {day}, FiveMinute: {five_minute}")
-                return 0
-            except Exception as e:
-                print(f"Unexpected error: {e}")
-                print(f"Problematic time object: {time}")
-                return 0
+    def __load_construction_zone(self, segment_id, temp_df, show_progress=True) :
+        if show_progress:
+            print("\tConstruction zone is preprocessing.")
         def add_is_construction(time) :
             if time == 0 :
                 return False
@@ -363,6 +386,7 @@ SELECT
     ETagPairLive_temp.StartMileage, 
     ETagPairLive_temp.EndMileage, 
     ETagPairLive_temp.Direction, 
+    ETagPairLive_temp.UTC,
     ETagPairLive_temp.Year, 
     ETagPairLive_temp.Month, 
     ETagPairLive_temp.Day, 
@@ -370,10 +394,6 @@ SELECT
     ETagPairLive_temp.VehicleType, 
     ETagPairLive_temp.SpaceMeanSpeed, 
     ETagPairLive_temp.VehicleCount,
-
-    ETagPairLive_temp.time,
-    construction_zone_temp.StartTime,
-    construction_zone_temp.EndTime,
 
     ETagPairLive_temp.is_accident,
     ETagPairLive_temp.RecoveryMinute,
@@ -386,71 +406,148 @@ SELECT
     ETagPairLive_temp.外路肩 AS traffic_accident_外路肩,
     ETagPairLive_temp.匝道 AS traffic_accident_匝道,
 
-    construction_zone_temp.ConstructionMinute,
-    construction_zone_temp.內側路肩 AS construction_內側路肩,
-    construction_zone_temp.第1車道, 
-    construction_zone_temp.第2車道, 
-    construction_zone_temp.第3車道, 
-    construction_zone_temp.第4車道, 
-    construction_zone_temp.第5車道, 
-    construction_zone_temp.第6車道, 
-    construction_zone_temp.第7車道, 
-    construction_zone_temp.第8車道, 
-    construction_zone_temp.外側路肩 AS construction_外側路肩,
-    construction_zone_temp.內邊坡 AS construction_內邊坡,
-    construction_zone_temp.外邊坡 AS construction_外邊坡
+    construction_zone.ConstructionMinute,
+    construction_zone.內側路肩 AS construction_內側路肩,
+    construction_zone.第1車道, 
+    construction_zone.第2車道, 
+    construction_zone.第3車道, 
+    construction_zone.第4車道, 
+    construction_zone.第5車道, 
+    construction_zone.第6車道, 
+    construction_zone.第7車道, 
+    construction_zone.第8車道, 
+    construction_zone.外側路肩 AS construction_外側路肩,
+    construction_zone.內邊坡 AS construction_內邊坡,
+    construction_zone.外邊坡 AS construction_外邊坡
 FROM ETagPairLive_temp
-LEFT JOIN construction_zone_temp
-ON ETagPairLive_temp.Highway = construction_zone_temp.Highway
-AND ETagPairLive_temp.Direction = construction_zone_temp.Direction
+LEFT JOIN construction_zone
+ON ETagPairLive_temp.Highway = construction_zone.Highway
+AND ETagPairLive_temp.Direction = construction_zone.Direction
+AND ETagPairLive_temp.Year = construction_zone.StartYear
+AND ETagPairLive_temp.UTC BETWEEN construction_zone.StartUTC AND construction_zone.EndUTC
 AND (
-    (ETagPairLive_temp.StartMileage BETWEEN construction_zone_temp.StartMileage AND construction_zone_temp.EndMileage)
-    OR
-    (ETagPairLive_temp.EndMileage BETWEEN construction_zone_temp.StartMileage AND construction_zone_temp.EndMileage)
+    NOT (
+        MAX(ETagPairLive_temp.StartMileage, ETagPairLive_temp.EndMileage) < MIN(construction_zone.StartMileage, construction_zone.EndMileage) 
+        OR 
+        MAX(construction_zone.StartMileage, construction_zone.EndMileage) < MIN(ETagPairLive_temp.StartMileage, ETagPairLive_temp.EndMileage)
+    )
 )
-AND ETagPairLive_temp.time BETWEEN construction_zone_temp.StartTime AND construction_zone_temp.EndTime
 '''
-        
-        # process time to comparable format
-        construction_df = pd.read_sql_query("SELECT * FROM construction_zone", self.processed_db.db)
-        construction_df['StartTime'] = construction_df.apply(lambda row: convert_to_sec(row['StartYear'], row['StartMonth'], row['StartDay'], row['StartFiveMinute']), axis=1)
-        construction_df['EndTime'] = construction_df.apply(lambda row: convert_to_sec(row['EndYear'], row['EndMonth'], row['EndDay'], row['EndFiveMinute']), axis=1)
-        construction_df['ConstructionMinute'] = construction_df.apply(lambda row: int((row['EndTime'] - row['StartTime'])//60), axis=1)
-        self.df['time'] = self.df.apply(lambda row: convert_to_sec(row['Year'], row['Month'], row['Day'], row['FiveMinute']), axis=1)
-
         # join the ETagPairLive and construction_zone
-        self.df.to_sql('ETagPairLive_temp', self.processed_db.db, if_exists='replace', index=True)
-        construction_df.to_sql('construction_zone_temp', self.processed_db.db, if_exists='replace', index=True)
-        self.df = pd.read_sql_query(JOIN_query, self.processed_db.db) 
+        self.batch_to_sql(temp_df, 'ETagPairLive_temp', self.processed_db.db)
+        temp_df = self.query_in_batches(JOIN_query, self.processed_db.db)
 
         self.processed_db.db.execute(f"DROP TABLE IF EXISTS ETagPairLive_temp")
-        self.processed_db.db.execute(f"DROP TABLE IF EXISTS construction_zone_temp")
-        pd.set_option("future.no_silent_downcasting", True)
-        self.df = self.df.fillna(0)
+        mpd.set_option("future.no_silent_downcasting", True)
+        temp_df = temp_df.fillna(0)
 
         # preprocess and store the data
-        self.df['is_construction'] = self.df['ConstructionMinute'].apply(add_is_construction)
+        temp_df['is_construction'] = temp_df['ConstructionMinute'].apply(add_is_construction)
 
-        # print the result
-        # pd.set_option('display.max_rows', None)
-        # pd.set_option('display.max_columns', None)
-        # result = self.df.query('is_construction == True')
-        # print("result", result.head(100))
-        print("\tConstruction zone is preprocessed and loaded.")
-        print("construction zone ETagpairLive number : ", len(self.df)) # to be deleted
+        if show_progress:
+            print("\tConstruction zone is preprocessed and loaded.")
+        return temp_df
         # end of __load_construction_zone function
 
-    def __load_holiday(self) :
-        print("\tHoliday is preprocessing.")
-        # print("columns : ", self.df.columns.to_list())
-        self.df['is_weekend'], self.df['is_holiday'], self.df['Holiday'], self.df['Month'], self.df['Day'], self.df['FiveMinute'] = zip(*self.df.apply(lambda row : modified_holiday_and_date_cosine_processor( row['Year'], row['Month'], row['Day'], row['FiveMinute']), axis=1))
+
+    def __load_holiday(self, segment_id, temp_df, show_progress=True) :
+        if show_progress:
+            print("\tHoliday is preprocessing.")
+        temp_df['is_weekend'], temp_df['is_holiday'], temp_df['Holiday'], temp_df['Month'], temp_df['Day'], temp_df['FiveMinute'] = zip(*temp_df.apply(lambda row : modified_holiday_and_date_cosine_processor( row['Year'], row['Month'], row['Day'], row['FiveMinute']), axis=1))
         
-        # print(self.df.head(10))
-        print("\tHoliday is preprocessed and loaded.")
-        print("holiday ETagpairLive number : ", len(self.df)) # to be deleted
+        if show_progress:
+            print("\tHoliday is preprocessed and loaded.")
+        return temp_df
         # end of __load_holiday function
 
-    def store_preprocessed_data(self) :
-        self.df.to_sql('preprocessed_data', self.processed_db.db, if_exists='replace', index=True)
-        print("\tPreprocessed data stored.")
+    def store_preprocessed_data(self, segment_id, temp_df) :
+        create_table_query = '''
+CREATE TABLE IF NOT EXISTS preprocessed_data (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    ETagPairID TEXT,
+    direction char(1),
+    highway INTEGER,
+    start_mileage FLOAT,
+    end_mileage FLOAT,
+    year INTEGER,
+
+    car INTEGER,
+    speed FLOAT,
+
+    utc INTEGER,
+
+    month FLOAT,
+    day FLOAT,
+    five_minute FLOAT,
+
+    is_weekend BOOLEAN,
+    is_holiday BOOLEAN,
+    holiday FLOAT,
+
+    has_accident BOOLEAN,
+    recovery_time INTEGER,
+    traffic_accident_內路肩 BOOLEAN,
+    traffic_accident_內車道 BOOLEAN,
+    traffic_accident_中內車道 BOOLEAN,
+    traffic_accident_中車道 BOOLEAN,
+    traffic_accident_中外車道 BOOLEAN,
+    traffic_accident_外車道 BOOLEAN,
+    traffic_accident_外路肩 BOOLEAN,
+    traffic_accident_匝道 BOOLEAN,
+
+    has_construction BOOLEAN,
+    construction_time INTEGER,
+    construction_第一車道 BOOLEAN,
+    construction_第二車道 BOOLEAN,
+    construction_第三車道 BOOLEAN,
+    construction_第四車道 BOOLEAN,
+    construction_第五車道 BOOLEAN,
+    construction_第六車道 BOOLEAN,
+    construction_第七車道 BOOLEAN,
+    construction_第八車道 BOOLEAN,
+    construction_外側路肩 BOOLEAN,
+    construction_內邊坡 BOOLEAN,
+    construction_外邊坡 BOOLEAN
+)
+'''
+        self.processed_db.cursor.execute(create_table_query)
+        self.processed_db.db.commit()
+
+        column_needed = [ 'UTC',
+            'ETagPairID', 'Direction', 'Highway', 'StartMileage', 'EndMileage', 'VehicleType', 'SpaceMeanSpeed', 
+            'Year', 'Month', 'Day', 'FiveMinute', 'is_weekend', 'is_holiday', 'Holiday',
+            'is_accident', 'RecoveryMinute', 'traffic_accident_內路肩', 'traffic_accident_內車道', 'traffic_accident_中內車道', 'traffic_accident_中車道', 'traffic_accident_中外車道', 'traffic_accident_外車道', 'traffic_accident_外路肩', 'traffic_accident_匝道',
+            'is_construction', 'ConstructionMinute', '第1車道', '第2車道', '第3車道', '第4車道', '第5車道', '第6車道', '第7車道', '第8車道', 'construction_外側路肩', 'construction_內邊坡', 'construction_外邊坡'
+        ]
+        rename_dict = {
+            'Direction': 'direction',
+            'Highway': 'highway',
+            'StartMileage': 'start_mileage',
+            'EndMileage': 'end_mileage',
+
+            'Year': 'year',
+            'Month': 'month',
+            'Day': 'day',
+            'FiveMinute': 'five_minute',
+
+            'VehicleType': 'car',
+            'SpaceMeanSpeed': 'speed',
+
+            'is_accident': 'has_accident',
+            'RecoveryMinute': 'recovery_time',
+
+            'is_construction': 'has_construction',
+            'ConstructionMinute': 'construction_time',
+            '第1車道': 'construction_第一車道',
+            '第2車道': 'construction_第二車道',
+            '第3車道': 'construction_第三車道',
+            '第4車道': 'construction_第四車道',
+            '第5車道': 'construction_第五車道',
+            '第6車道': 'construction_第六車道',
+            '第7車道': 'construction_第七車道',
+            '第8車道': 'construction_第八車道',
+        }
+        temp_df = temp_df[column_needed]
+        temp_df = temp_df.rename(columns=rename_dict)
+        self.batch_to_sql(temp_df, 'preprocessed_data', self.processed_db.db)
         # end of store_preprocessed_data function
