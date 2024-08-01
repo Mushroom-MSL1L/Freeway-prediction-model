@@ -1,6 +1,6 @@
 import xml.etree.ElementTree as ET
 import pandas as pd
-from datetime import datetime, timedelta
+from datetime import datetime, timezone
 import re 
 
 """
@@ -65,6 +65,7 @@ def convert_and_store_ETagPairLive(store_path, conn, car_code_needed, segment_id
             StartMileage    REAL,
             EndMileage      REAL,
             Direction       CHAR(1),
+            UTC             INTEGER,
             Year            INTEGER,
             Month           INTEGER,
             Day             INTEGER,
@@ -123,18 +124,19 @@ def convert_and_store_ETagPairLive(store_path, conn, car_code_needed, segment_id
             # process ETagPairID to highway, start_mileage, end_mileage, direction
             highway, start_mileage, end_mileage, direction = parse_ETagPairID(etag_pair_id)
             # process time to year, month, day, five_minute
-            dt = datetime.fromisoformat(start_time)
+            dt = datetime.fromisoformat(start_time).replace(tzinfo=timezone.utc)
             year = dt.year
             month = dt.month
             day = dt.day
             start_dt_of_day = dt
             start_dt_of_day = start_dt_of_day.replace(hour=0, minute=0, second=0, microsecond=0)
             five_minute = int((dt - start_dt_of_day).seconds / 300) # 5 min = 300 sec
+            UTC = int(dt.timestamp())
             # store data to database as ETagPairLive schema
             c.execute('''
-                INSERT INTO ETagPairLive (ETagPairID, Highway, StartMileage, EndMileage, Direction, Year, Month, Day, FiveMinute, VehicleType, SpaceMeanSpeed, VehicleCount)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ''', (etag_pair_id, highway, start_mileage, end_mileage, direction, year, month, day, five_minute, vehicle_type, space_mean_speed, vehicle_count)
+                INSERT INTO ETagPairLive (ETagPairID, Highway, StartMileage, EndMileage, Direction, UTC, Year, Month, Day, FiveMinute, VehicleType, SpaceMeanSpeed, VehicleCount)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (etag_pair_id, highway, start_mileage, end_mileage, direction, UTC, year, month, day, five_minute, vehicle_type, space_mean_speed, vehicle_count)
             )
     conn.db.commit()
     # end of convert_and_store_ETagPairLive function
@@ -243,19 +245,22 @@ def convert_and_store_traffic_accident(store_path, conn):
         else:
             return False
         # end of one_hot function
-    
+    def transform_to_utc (year, month, day, hour, minute) :
+        dt = datetime(year, month, day, hour, minute, tzinfo=timezone.utc)
+        return int(dt.timestamp())
+        # end of transform_to_utc function
     create_table_query = '''
     CREATE TABLE IF NOT EXISTS traffic_accident (
         ID              INTEGER PRIMARY KEY AUTOINCREMENT,
         Highway         INTEGER,
         Direction       CHAR(1),
         Mileage         REAL,
+        StartUTC        INTEGER,
+        EndUTC          INTEGER,
         Year            INTEGER,
         Month           INTEGER,
         Day             INTEGER,
         RecoveryMinute  INTEGER,
-        FiveMinuteStart INTEGER,
-        FiveMinuteEnd   INTEGER,
         內路肩          BOOLEAN,
         內車道          BOOLEAN,
         中內車道        BOOLEAN,
@@ -280,6 +285,8 @@ def convert_and_store_traffic_accident(store_path, conn):
     data_subset = data_file[selected_columns]
     
     # process data
+    data_subset['StartUTC'] = data_subset.apply(lambda x : transform_to_utc(x['年'], x['月'], x['日'], x['時'], x['分']), axis=1)
+    data_subset['EndUTC'] = data_subset['StartUTC'] + data_subset['處理分鐘'] * 60
     data_subset['Highway'] = data_subset['國道名稱'].apply(extract_highway_number)
     data_subset['Direction'] = data_subset['方向'].apply(convert_direction)
     data_subset['FiveMinuteStart'] = (data_subset['時'] * 60 + data_subset['分']) // 5
@@ -296,6 +303,8 @@ def convert_and_store_traffic_accident(store_path, conn):
     # change data type
     data_subset = data_subset.dropna()
     data_need_to_be_int = ['Highway', 'FiveMinuteStart', 'FiveMinuteEnd']
+    data_subset['StartUTC'] = data_subset['StartUTC'].astype(int)
+    data_subset['EndUTC'] = data_subset['EndUTC'].astype(int)
     data_subset['Year'] = data_subset['年'].astype(int)
     data_subset['Month'] = data_subset['月'].astype(int)
     data_subset['Day'] = data_subset['日'].astype(int)
@@ -308,10 +317,10 @@ def convert_and_store_traffic_accident(store_path, conn):
     data_subset[data_need_to_be_bool].astype(bool)
 
     # store data to database
-    final_columns = ['Highway', 'Direction', 'Mileage', 'Year', 'Month', 'Day', 'FiveMinuteStart', 'RecoveryMinute', 'FiveMinuteEnd', '內路肩', '內車道', '中內車道', '中車道', '中外車道', '外車道', '外路肩', '匝道']
+    final_columns = ['Highway', 'Direction', 'Mileage', 'StartUTC', 'EndUTC', 'Year', 'Month', 'Day', 'RecoveryMinute', '內路肩', '內車道', '中內車道', '中車道', '中外車道', '外車道', '外路肩', '匝道']
     # print(data_subset[final_columns].head())
     # print("columns name: ", data_subset.columns.to_list())
-    data_subset[final_columns].to_sql('traffic_accident', conn.db, if_exists='replace', index=True)
+    data_subset[final_columns].to_sql('traffic_accident', conn.db, if_exists='append', index=False)
 
     conn.db.commit()
     # end of convert_and_store_traffic_accident function
@@ -404,6 +413,7 @@ def convert_and_store_construction_zone(store_path, conn):
         if len(str(control)) < 10 :
             return None
         dt = datetime.strptime(str(control), "%Y-%m-%d %H:%M:%S")
+        dt = dt.replace(tzinfo=timezone.utc)
         year = dt.year
         month = dt.month
         day = dt.day
@@ -418,33 +428,52 @@ def convert_and_store_construction_zone(store_path, conn):
             return int(day)
         elif "FiveMinute" in target:
             return int(five_minute_of_day)
+        elif "UTC" in target:
+            return int(dt.timestamp())
         else:
             return None
         # end of separate_time function
     def handle_mileage (start_mileage, end_mileage) :
-        if pd.isnull(start_mileage) or pd.isnull(end_mileage):
+        try :
+            if pd.isnull(start_mileage) or pd.isnull(end_mileage):
+                return None, None
+            start_mileage = float(start_mileage)
+            end_mileage = float(end_mileage)
+            if start_mileage == 0:
+                return end_mileage / 1000, end_mileage / 1000
+            if end_mileage == 0:
+                return start_mileage / 1000, start_mileage / 1000
+            return start_mileage / 1000, end_mileage / 1000
+        except :
             return None, None
-        if start_mileage > end_mileage:
-            return None, None
-        if start_mileage == 0:
-            return end_mileage / 1000, end_mileage / 1000
-        if end_mileage == 0:
-            return start_mileage / 1000, start_mileage / 1000
-        return start_mileage / 1000, end_mileage / 1000
         # end of handle_mileage function
-    
+    def get_construction_minute (start_time, end_time) :
+        if pd.isnull(start_time) or pd.isnull(end_time):
+            return None
+        if len(str(start_time)) < 10 or len(str(end_time)) < 10:
+            return None
+        dt_start = datetime.strptime(str(start_time), "%Y-%m-%d %H:%M:%S")
+        dt_end = datetime.strptime(str(end_time), "%Y-%m-%d %H:%M:%S")
+        return int((dt_end - dt_start).seconds / 60)
+        # end of get_construction_minute function
     # create table
     create_table_query = '''
     CREATE TABLE IF NOT EXISTS construction_zone (
         ID                 INTEGER PRIMARY KEY AUTOINCREMENT,
+
+        StartUTC          INTEGER,
         StartYear          INTEGER,
         StartMonth         INTEGER,
         StartDay           INTEGER,
         StartFiveMinute   INTEGER,
+
+        EndUTC            INTEGER,
         EndYear            INTEGER,
         EndMonth           INTEGER,
         EndDay             INTEGER,
         EndFiveMinute     INTEGER,
+
+        ConstructionMinute INTEGER,
         Highway             INTEGER,
         Direction           CHAR(1),
         StartMileage       REAL,
@@ -474,8 +503,8 @@ def convert_and_store_construction_zone(store_path, conn):
     # process data
     data_subset['Highway'] = data_subset['incStepFreewayId'].apply(extract_highway_number)
     data_subset['Direction'] = data_subset['incStepDirection'].apply(convert_direction)
-    start_time_list = ['StartYear', 'StartMonth', 'StartDay', 'StartFiveMinute']
-    end_time_list = ['EndYear', 'EndMonth', 'EndDay', 'EndFiveMinute']
+    start_time_list = ['StartUTC', 'StartYear', 'StartMonth', 'StartDay', 'StartFiveMinute']
+    end_time_list = ['EndUTC', 'EndYear', 'EndMonth', 'EndDay', 'EndFiveMinute']
     route_list = ['內側路肩', '第1車道', '第2車道', '第3車道', '第4車道', '第5車道', '第6車道', '第7車道', '第8車道', '外側路肩', '內邊坡', '外邊坡']
     for option in start_time_list :
         data_subset[option] = data_subset.apply(lambda x : separate_time(option, x['incStepTime']), axis=1)
@@ -484,21 +513,22 @@ def convert_and_store_construction_zone(store_path, conn):
     for route in route_list :
         data_subset[route] = data_subset.apply(lambda x : one_hot(route, x['incStepBlockagePattern']), axis=1)
     data_subset['StartMileage'], data_subset['EndMileage'] = zip(*data_subset.apply(lambda x : handle_mileage(x['incStepStartMileage'], x['incStepEndMileage']), axis=1))
+    data_subset['ConstructionMinute'] = data_subset.apply(lambda x : get_construction_minute(x['incStepTime'], x['incStepEndTime']), axis=1)
     # 註 : pandas dataframe 這邊用到"多參數用法"與"多回傳值用法"，所以長得特別奇怪
 
     # change data type
     data_subset = data_subset.dropna()
-    data_need_to_be_int = ['StartYear', 'StartMonth', 'StartDay', 'StartFiveMinute', 'EndYear', 'EndMonth', 'EndDay', 'EndFiveMinute', 'Highway']
+    data_need_to_be_int = ['ConstructionMinute', 'StartUTC', 'StartYear', 'StartMonth', 'StartDay', 'StartFiveMinute', 'EndUTC', 'EndYear', 'EndMonth', 'EndDay', 'EndFiveMinute', 'Highway']
     data_subset[data_need_to_be_int] = data_subset[data_need_to_be_int].astype(int)
     data_subset['Direction'] = data_subset['Direction'].astype(str).str[0]
     data_need_to_be_bool = route_list
     data_subset[data_need_to_be_bool].astype(bool)
     
     # store data to database
-    final_columns = ['StartYear', 'StartMonth', 'StartDay', 'StartFiveMinute', 'EndYear', 'EndMonth', 'EndDay', 'EndFiveMinute', 'Highway', 'Direction', 'StartMileage', 'EndMileage', '內側路肩', '第1車道', '第2車道', '第3車道', '第4車道', '第5車道', '第6車道', '第7車道', '第8車道', '外側路肩', '內邊坡', '外邊坡']
+    final_columns = ['ConstructionMinute', 'StartUTC', 'StartYear', 'StartMonth', 'StartDay', 'StartFiveMinute', 'EndUTC', 'EndYear', 'EndMonth', 'EndDay', 'EndFiveMinute', 'Highway', 'Direction', 'StartMileage', 'EndMileage', '內側路肩', '第1車道', '第2車道', '第3車道', '第4車道', '第5車道', '第6車道', '第7車道', '第8車道', '外側路肩', '內邊坡', '外邊坡']
     # print(data_subset[final_columns].head())
     # print("columns name: ", data_subset.columns.to_list())
-    data_subset[final_columns].to_sql('construction_zone', conn.db, if_exists='replace', index=True)
+    data_subset[final_columns].to_sql('construction_zone', conn.db, if_exists='append', index=False)
     
     conn.db.commit()
     # end of convert_and_store_construction_zone function
