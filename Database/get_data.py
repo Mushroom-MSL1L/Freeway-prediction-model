@@ -63,16 +63,16 @@ class GetData:
             }
         ]
         for _, ds in enumerate(tqdm(data_sources, desc='fetch all data(except ETagPairLive)')):
-            self.__fetch_data(ds['url'], ds['file_name'], ds['data_type'], skip_exist=True, delete_file=False)
+            self.__fetch_data(ds['url'], ds['file_name'], ds['data_type'], skip_exist=True, delete_file=False, show_exist=False, show_delete=False)
 
         if self.car_code_needed == []:
             raise ValueError("car_code_needed is empty, should be a valid car code list")
-        self.__fetch_all_ETagPairLive(skip_exist=True, delete_file=True, show_delete=False)
+        self.__fetch_all_ETagPairLive(skip_exist=True, delete_file=True, show_exist=False, show_delete=False)
         print("All data successfully inserted into the SQLite3 database.")
         # end of fetch_all_data function
 
     # main sub-function
-    def __fetch_data(self, url, file_name, data_type, addition_path="", skip_exist=True, delete_file=True, show_delete=True):
+    def __fetch_data(self, url, file_name, data_type, addition_path="", skip_exist=True, delete_file=True, show_exist=False, show_delete=False):
         """
         get one data and process it from url
         store in Database/assets folder
@@ -89,7 +89,7 @@ class GetData:
 
         # check if file exist
         store_path = self.__get_path('assets/'+addition_path+'/'+file_name)
-        if skip_exist and self.__check_gotton(store_path, addition_path+'/'+file_name):
+        if skip_exist and self.__check_gotton(store_path, addition_path+'/'+file_name, show_exist):
             return
 
         # main function
@@ -170,7 +170,7 @@ class GetData:
             print("The file does not exist, file path is " + store_path)
 
     # warning comments
-    def __fetch_all_ETagPairLive(self, skip_exist=True, delete_file=True, show_delete=False):
+    def __fetch_all_ETagPairLive(self, skip_exist=True, delete_file=True, show_exist=False, show_delete=False):
         ## 112年1月1號得資料在2023/0101/0025
         ## 112年10月31號得資料在2023/1101/0020
         ## 113年1月1號得資料在2024/0101/0025
@@ -179,13 +179,14 @@ class GetData:
         # self.__fetch_ETagPairLive(2024, 1, 1, 0, 25, 2024, 3, 1, 0, 20) # 113年主要資料
 
         ## test data
-        self.__fetch_ETagPairLive(2023, 1, 1, 0, 25, 2023, 1, 1, 0, 25, skip_exist, delete_file, show_delete)
-        self.__fetch_ETagPairLive(2023, 1, 1, 8, 00, 2023, 1, 1, 9, 00, skip_exist, delete_file, show_delete)
-        self.__fetch_ETagPairLive(2023, 11, 1, 0, 20, 2023, 11, 1, 0, 20)
-        self.__fetch_ETagPairLive(2024, 1, 1, 0, 25, 2024, 1, 1, 0, 25)
-        self.__fetch_ETagPairLive(2024, 3, 1, 0, 20, 2024, 3, 1, 0, 20)
+        self.__fetch_ETagPairLive(2023, 7, 17, 7, 00, 2023, 7, 17, 8, 00, skip_exist, delete_file, show_exist, show_delete) # 01F0928N-01F0880N should have accident
+        self.__fetch_ETagPairLive(2023, 6, 28, 3, 40, 2023, 6, 28, 4, 40, skip_exist, delete_file, show_exist, show_delete) # 01F0928N-01F0880N should have construction
+        # self.__fetch_ETagPairLive(2023, 1, 1, 0, 25, 2023, 1, 1, 0, 25, skip_exist, delete_file, show_delete)
+        # self.__fetch_ETagPairLive(2023, 11, 1, 0, 20, 2023, 11, 1, 0, 20)
+        # self.__fetch_ETagPairLive(2024, 1, 1, 0, 25, 2024, 1, 1, 0, 25)
+        # self.__fetch_ETagPairLive(2024, 3, 1, 0, 20, 2024, 3, 1, 0, 20)
 
-    def __fetch_ETagPairLive(self, begin_year, begin_month, begin_day, begin_hour, begin_min, end_year, end_month, end_day, end_hour, end_min, skip_exist=True, delete_file=True, show_delete=False):
+    def __fetch_ETagPairLive(self, begin_year, begin_month, begin_day, begin_hour, begin_min, end_year, end_month, end_day, end_hour, end_min, skip_exist=True, delete_file=True, show_exist=False, show_delete=False):
         def get_time_range (start_time, end_time):
             current_time = start_time
             while current_time <= end_time:
@@ -206,7 +207,7 @@ class GetData:
             try : 
                 file_name = "ETagPairLive_" + str(begin_year) + '_' + '{:02}'.format(current_time.month) + '{:02}'.format(current_time.day) + '_' + '{:02}'.format(current_time.hour) + '{:02}'.format(current_time.minute) + ".xml"
                 url = "https://tisvcloud.freeway.gov.tw/history/motc20/ETag/" + str(begin_year) + '{:02}'.format(current_time.month) + '{:02}'.format(current_time.day) + '/' + "ETagPairLive_" + '{:02}'.format(current_time.hour) + '{:02}'.format(current_time.minute) + ".xml.gz"
-                self.__fetch_data(url, file_name, data_type, addition_path=addition_path, skip_exist=skip_exist, delete_file=delete_file, show_delete=show_delete)
+                self.__fetch_data(url, file_name, data_type, addition_path=addition_path, skip_exist=skip_exist, delete_file=delete_file, show_exist=show_exist, show_delete=show_delete)
             except Exception as e:
                 print("Error: ", e)
                 print("Error occurred during fetching the ETagPairLive data from url: ", url)
@@ -214,14 +215,16 @@ class GetData:
                 pass
         # end of fetch_ETagPairLive function
 
-    def __check_gotton(self, store_path, file_name):
+    def __check_gotton(self, store_path, file_name, show_exist = True):
         if os.path.exists(store_path):
-            print("file \"" + file_name + "\" exist in asset, skip file:"+ file_name)
+            if show_exist:
+                print("file \"" + file_name + "\" exist in asset, skip file:"+ file_name)
             return 1
         try:
             with open(self.__get_path('assets/file_list.txt'), 'r') as f:
                 if file_name in f.read():
-                    print("file \"" + file_name + "\" exist in asset, skip file:"+ file_name)
+                    if show_exist:
+                        print("file \"" + file_name + "\" exist in asset, skip file:"+ file_name)
                     return 1 
         except:
             if os.path.exists(self.__get_path('assets/file_list.txt')) == False:
