@@ -22,13 +22,18 @@ class Preprocess():
         self.segment_id_needed = self.set_segment_id_needed(segment_id_needed)
         self.car_code_needed = self.set_car_code_needed(car_code_needed)
         self.db_name = 'row.db'
+        self.df = mpd.DataFrame()
         self.get_data = GetData(db_name=self.db_name, car_code_needed=self.car_code_needed, segment_id_needed=self.segment_id_needed, already_fetched=already_fetched)
         self.processed_db = self.get_data.Database
-        self.df = mpd.DataFrame()
         self.car_map = self.__get_car_frequency(already_preprocessed)
         self.__preprocess_all_data(already_preprocessed)
 
     def get_preprocessed_data(self) :
+        query = '''
+            SELECT *
+            FROM preprocessed_data
+        '''
+        self.df = self.query_in_batches(query, self.processed_db.db)
         return self.df
 
     def get_car_map(self) :
@@ -79,29 +84,47 @@ class Preprocess():
         return car_code_needed
 
     def __preprocess_all_data(self, already_preprocessed = False) :
+        def get_UTC_range() :
+            query = '''
+                SELECT MIN(UTC) as min, MAX(UTC) as max
+                FROM ETagPairLive
+            '''
+            result = self.processed_db.cursor.execute(query).fetchone()
+            min_value, max_value = result
+            return min_value, max_value
+        # check if the preprocessed data already exists
         if already_preprocessed:
             try:
                 preprocessed_data_query = '''
                     SELECT *
                     FROM preprocessed_data
+                    limit 1
                 '''
-                all_df = mpd.DataFrame()
-                all_df = self.query_in_batches(preprocessed_data_query, self.processed_db.db)
-                self.df = all_df
+                one_df = mpd.DataFrame()
+                one_df = self.query_in_batches(preprocessed_data_query, self.processed_db.db)
+                self.df = one_df
                 print("\tPreprocessed data already fetched, skip preprocessing.")
                 return
             except:
                 raise ValueError("Preprocessed data not found")
-        all_df = mpd.DataFrame()
+        # begin of preprocessing
         show_progress = False
-        for _, segment in enumerate(tqdm(self.segment_id_needed, desc='Preprocessing data……')) :
-            temp_df = mpd.DataFrame()
-            temp_df = self.__load_ETagPairLive(segment['ID'], show_progress)
-            temp_df = self.__load_traffic_accident(segment['ID'], temp_df, show_progress)
-            temp_df = self.__load_construction_zone(segment['ID'], temp_df, show_progress)
-            temp_df = self.__load_holiday(segment['ID'], temp_df, show_progress)
-            all_df = mpd.concat([all_df, temp_df], ignore_index=True)
-        self.df = self.store_preprocessed_data(segment['ID'], all_df)
+        min_UTC, max_UTC = get_UTC_range()
+        for _, segment in enumerate(tqdm(self.segment_id_needed, desc='Preprocessing all segment data……')) :
+            time_width = 86400 * 10 # 每次處理10天的資料
+            run_times = (max_UTC - min_UTC) // time_width + 1
+            current_min_UTC = min_UTC
+            current_max_UTC = min(min_UTC + time_width, max_UTC)
+            for _, _ in enumerate(tqdm(range(run_times), desc=f'Preprocessing segment data {segment["ID"]}')) :
+                temp_df = mpd.DataFrame()
+                temp_df = self.__load_ETagPairLive(segment['ID'], show_progress, current_min_UTC, current_max_UTC)
+                temp_df = self.__load_traffic_accident(segment['ID'], temp_df, show_progress)
+                temp_df = self.__load_construction_zone(segment['ID'], temp_df, show_progress)
+                temp_df = self.__load_holiday(segment['ID'], temp_df, show_progress)
+                self.store_preprocessed_data(segment['ID'], temp_df)
+                current_min_UTC = current_max_UTC + 60 * 5 # 加上5分鐘
+                current_max_UTC = min(current_min_UTC + time_width, max_UTC)
+        print("\tPreprocessed data stored.")
 
 ### warning : here need to specify the car_code_needed and car groups
     """
@@ -203,13 +226,19 @@ class Preprocess():
             3. aggregate the same vehicle type
             4. store the preprocessed data as member variable Preprocess.df
     """
-    def __load_ETagPairLive(self, segment_id, show_progress=True) :
+    def __load_ETagPairLive(self, segment_id, show_progress=True, min_UTC=0, max_UTC=0) :
+        # exception handling
         if show_progress:
             print("\tETagPairLive is preprocessing.")
+        if min_UTC == 0 or max_UTC == 0:
+            raise ValueError("min_UTC and max_UTC should be specified")
+        
+        # load the ETagPairLive data
         load_ETagePair_query = f'''
             SELECT *
             FROM ETagPairLive
             WHERE ETagPairID = '{segment_id}'
+            AND UTC BETWEEN {min_UTC} AND {max_UTC}
         '''
         def map_vehicle_type(row, car_map):
             return car_map[row['VehicleType']]
@@ -521,6 +550,4 @@ CREATE TABLE IF NOT EXISTS preprocessed_data (
         temp_df = temp_df[column_needed]
         temp_df = temp_df.rename(columns=rename_dict)
         self.batch_to_sql(temp_df, 'preprocessed_data', self.processed_db.db)
-        print("\tPreprocessed data stored.")
-        return temp_df
         # end of store_preprocessed_data function
