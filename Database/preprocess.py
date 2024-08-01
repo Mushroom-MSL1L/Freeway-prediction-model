@@ -17,7 +17,7 @@ Purpose of the file :
 """
 
 class Preprocess():
-    def __init__(self, segment_id_needed, car_code_needed, already_fetched=False) : 
+    def __init__(self, segment_id_needed, car_code_needed, already_fetched=False, already_preprocessed=False) : 
         # main functions 
         self.segment_id_needed = self.set_segment_id_needed(segment_id_needed)
         self.car_code_needed = self.set_car_code_needed(car_code_needed)
@@ -25,11 +25,14 @@ class Preprocess():
         self.get_data = GetData(db_name=self.db_name, car_code_needed=self.car_code_needed, segment_id_needed=self.segment_id_needed, already_fetched=already_fetched)
         self.processed_db = self.get_data.Database
         self.df = mpd.DataFrame()
-        self.car_map = self.__get_car_frequency()
-        self.__preprocess_all_data()
+        self.car_map = self.__get_car_frequency(already_preprocessed)
+        self.__preprocess_all_data(already_preprocessed)
 
     def get_preprocessed_data(self) :
         return self.df
+
+    def get_car_map(self) :
+        return self.car_map
 
     def batch_to_sql(self, df, table_name, conn, chunksize=10000):
         for start in range(0, len(df), chunksize):
@@ -75,7 +78,20 @@ class Preprocess():
             raise ValueError("car_code_needed should have more than 0 elements")
         return car_code_needed
 
-    def __preprocess_all_data(self) :
+    def __preprocess_all_data(self, already_preprocessed = False) :
+        if already_preprocessed:
+            try:
+                preprocessed_data_query = '''
+                    SELECT *
+                    FROM preprocessed_data
+                '''
+                all_df = mpd.DataFrame()
+                all_df = self.query_in_batches(preprocessed_data_query, self.processed_db.db)
+                self.df = all_df
+                print("\tPreprocessed data already fetched, skip preprocessing.")
+                return
+            except:
+                raise ValueError("Preprocessed data not found")
         all_df = mpd.DataFrame()
         show_progress = False
         for _, segment in enumerate(tqdm(self.segment_id_needed, desc='Preprocessing data……')) :
@@ -106,7 +122,22 @@ class Preprocess():
             4. store the frequency in the database
             5. return the frequency as Preprocess.car_map dictionary
     """
-    def __get_car_frequency(self) :
+    def __get_car_frequency(self, already_preprocessed = False) :
+        if already_preprocessed:
+            try: 
+                car_encode_map = {}
+                car_frequency_query = '''
+                    SELECT CarCode, Frequency
+                    FROM CarFrequency
+                '''
+                car_frequency = self.query_in_batches(car_frequency_query, self.processed_db.db)
+                for index, row in car_frequency.iterrows():
+                    car_encode_map[int(row['CarCode'])] = float(row['Frequency'])
+                print("\tCar frequency already fetched, skip fetching from database.")
+                return car_encode_map
+            except:
+                raise ValueError("Car frequency not found")
+        
         # get the car numbers from the database
         # only in 2023, 102
         count_car_number_query = '''
@@ -134,7 +165,7 @@ class Preprocess():
         for index, row in car_amount.iterrows():
             car_code = row['VehicleType']
             if car_code in car_code_needed:
-                car_encode_map[car_code] = round(car_frequency[car_type_map[car_code]], 3)
+                car_encode_map[int(car_code)] = round(float(car_frequency[car_type_map[car_code]]), 3)
         print("\tCar frequency fetched")
 
         # create the table
