@@ -11,14 +11,15 @@ from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 
 class Model:
     my_model=None
+    x_train=None
+    x_test=None
+    y_train=None
+    y_test=None
 
-    def __init__(self, x_train, y_train, x_test, y_test):
-        self.x_train = x_train
-        self.y_train = y_train
-        self.x_test = x_test
-        self.y_test = y_test
+    def __init__(self):
+        pass
 
-    def train(self, _n_estimators=100, _max_features=None, _max_depth=None, _min_samples_leaf=1, import_model=False, save_model=True, path=""):
+    def train(self, _n_estimators, _max_features, _max_depth, _min_samples_leaf, import_model=False, save_model=True, path=""):
         """
         train the model
 
@@ -26,12 +27,6 @@ class Model:
             model is imported and saved by 'path' variable, change it to load/save model correctly!
         
         input:
-            x: data used to predict outcome in panda dataframe's format
-            y: outcome
-
-            dataset parameters:
-                _test_size:    a float between 0 and 1 to indicate the ratio of test dataset
-                _random_split: a boolean indicate whether dataset is split randomly into train and test dataset every time function is called
             
             model parameters: 
                 _n_estimator:      an integer indicate the number of decision tree in random forest
@@ -48,37 +43,17 @@ class Model:
         
         if import_model:
             try :
-                my_model = joblib.load(path)
+                self.my_model = joblib.load(path)
                 print("model imported")
             except:
                 raise ValueError("model not found")
         else:
-            my_model = RandomForestRegressor(n_estimators=_n_estimators, max_features=_max_features, max_depth=_max_depth, min_samples_leaf=_min_samples_leaf)
+            self.my_model = RandomForestRegressor(n_estimators=_n_estimators, max_features=_max_features, max_depth=_max_depth, min_samples_leaf=_min_samples_leaf)
             self.my_model.fit(self.x_train, self.y_train)
 
         if save_model:
-            joblib.dump(my_model, path)
+            joblib.dump(self.my_model, path)
             print("model saved, at ", path)
-
-    def __get_path (self, file_name):
-        current_file_path = os.path.realpath(__file__)
-        current_dir_path = os.path.dirname(current_file_path)
-        file_path = os.path.join(current_dir_path, file_name)
-        return file_path
-
-    def test_model_with_diabetes(self):
-        """
-        run "python model.py" to test model training function with example dataset
-        """
-        path = "random_forest.joblib"
-        diabete = load_diabetes()
-        x = pd.DataFrame(diabete.data, columns=diabete.feature_names)
-        y = diabete.target
-
-        print("testing training model...")
-        self.train(x, y, _random_split=False, import_model=False, save_model=True, path=path)
-        print("testing importing model...")
-        self.train(x, y, _random_split=False, import_model=True, save_model=False, path=path)
 
     def test(self):
         y_pred = self.my_model.predict(self.x_test)
@@ -95,3 +70,44 @@ class Model:
                     f"{performance.importances_mean[i]:.3f}"
                     f" +/- {performance.importances_std[i]:.3f}")
         print("--------------------end--------------------\n")
+
+    def __get_path (self, file_name):
+        current_file_path = os.path.realpath(__file__)
+        current_dir_path = os.path.dirname(current_file_path)
+        file_path = os.path.join(current_dir_path, file_name)
+        return file_path
+
+    def test_model_with_diabetes(self):
+        """
+        test model training and testing function with example dataset 'diabetes'
+        """
+        path = "random_forest.joblib"
+        diabete = load_diabetes()
+        x = pd.DataFrame(diabete.data, columns=diabete.feature_names)
+        y = diabete.target
+
+        self.x_train, self.x_test, self.y_train, self.y_test = train_test_split(x, y, test_size=0.2)
+
+        print("testing training model...")
+        self.train(_n_estimator=100, _max_features=None, _max_depth=None, _min_samples_leaf=1, import_model=False, save_model=True, path=path)
+        self.test()
+
+        print("testing importing model...")
+        self.train(_n_estimator=100, _max_features=None, _max_depth=None, _min_samples_leaf=1, import_model=True, save_model=False, path=path)
+        self.test()
+    
+    def test_model_with_freeway(self, df, __n_estimators=100, __max_features=None, __max_depth=None, __min_samples_leaf=1, _import_model=False, _save_model=True):
+        """
+        train and test model with freeway dataset
+        """
+        train_data=df.query("year=2023")
+        test_data=df.query("year=2024")
+
+        self.x_train=train_data.loc[:, df.columns != 'speed']
+        self.x_test=test_data.loc[:, df.columns != 'speed']
+        self.y_train=train_data['speed']
+        self.y_test=test_data['speed']
+
+        print("training model...")
+        self.train( _n_estimators=__n_estimators, _max_features=__max_features, _max_depth=__max_depth, _min_samples_leaf=__min_samples_leaf, import_model=_import_model, save_model=_save_model, path="random_forest.joblib")
+        self.test()
