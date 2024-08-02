@@ -84,12 +84,13 @@ class Preprocess():
         return car_code_needed
 
     def __preprocess_all_data(self, already_preprocessed = False) :
-        def get_UTC_range() :
+        def get_UTC_range(year) :
             query = '''
                 SELECT MIN(UTC) as min, MAX(UTC) as max
                 FROM ETagPairLive
+                WHERE Year = ?
             '''
-            result = self.processed_db.cursor.execute(query).fetchone()
+            result = self.processed_db.db.execute(query, (year,)).fetchone()
             min_value, max_value = result
             return min_value, max_value
         # check if the preprocessed data already exists
@@ -109,21 +110,23 @@ class Preprocess():
                 raise ValueError("Preprocessed data not found")
         # begin of preprocessing
         show_progress = False
-        min_UTC, max_UTC = get_UTC_range()
+        
         for _, segment in enumerate(tqdm(self.segment_id_needed, desc='Preprocessing all segment data……')) :
             time_width = 86400 * 10 # 每次處理10天的資料
-            run_times = (max_UTC - min_UTC) // time_width + 1
-            current_min_UTC = min_UTC
-            current_max_UTC = min(min_UTC + time_width, max_UTC)
-            for _, _ in enumerate(tqdm(range(run_times), desc=f'Preprocessing segment data {segment["ID"]}')) :
-                temp_df = mpd.DataFrame()
-                temp_df = self.__load_ETagPairLive(segment['ID'], show_progress, current_min_UTC, current_max_UTC)
-                temp_df = self.__load_traffic_accident(segment['ID'], temp_df, show_progress)
-                temp_df = self.__load_construction_zone(segment['ID'], temp_df, show_progress)
-                temp_df = self.__load_holiday(segment['ID'], temp_df, show_progress)
-                self.store_preprocessed_data(segment['ID'], temp_df)
-                current_min_UTC = current_max_UTC + 60 * 5 # 加上5分鐘
-                current_max_UTC = min(current_min_UTC + time_width, max_UTC)
+            for year in range(2023, 2024 + 1) :
+                min_UTC, max_UTC = get_UTC_range(year)
+                run_times = (max_UTC - min_UTC) // time_width + 1
+                current_min_UTC = min_UTC
+                current_max_UTC = min(min_UTC + time_width, max_UTC)
+                for _, _ in enumerate(tqdm(range(run_times), desc=f'Preprocessing segment data {segment["ID"]} in {year} ')) :
+                    temp_df = mpd.DataFrame()
+                    temp_df = self.__load_ETagPairLive(segment['ID'], show_progress, current_min_UTC, current_max_UTC)
+                    temp_df = self.__load_traffic_accident(segment['ID'], temp_df, show_progress)
+                    temp_df = self.__load_construction_zone(segment['ID'], temp_df, show_progress)
+                    temp_df = self.__load_holiday(segment['ID'], temp_df, show_progress)
+                    self.store_preprocessed_data(segment['ID'], temp_df)
+                    current_min_UTC = current_max_UTC + 60 * 5 # 加上5分鐘
+                    current_max_UTC = min(current_min_UTC + time_width, max_UTC)
         print("\tPreprocessed data stored.")
 
 ### warning : here need to specify the car_code_needed and car groups
