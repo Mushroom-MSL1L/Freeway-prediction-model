@@ -96,14 +96,19 @@ class Preprocess():
         # check if the preprocessed data already exists
         if already_preprocessed:
             try:
+                test_query = '''
+                    SELECT COUNT(*)
+                    FROM preprocessed_data
+                '''
                 preprocessed_data_query = '''
                     SELECT *
                     FROM preprocessed_data
-                    limit 1
                 '''
-                one_df = mpd.DataFrame()
-                one_df = self.query_in_batches(preprocessed_data_query, self.processed_db.db)
-                self.df = one_df
+                if self.processed_db.db.execute(test_query).fetchone()[0] == 0 or self.processed_db.db.execute(preprocessed_data_query).fetchone() == None:
+                    raise ValueError("Preprocessed data not found")
+                all_df = mpd.DataFrame()
+                all_df = self.query_in_batches(preprocessed_data_query, self.processed_db.db)
+                self.df = all_df
                 print("\tPreprocessed data already fetched, skip preprocessing.")
                 return
             except:
@@ -115,6 +120,8 @@ class Preprocess():
             time_width = 86400 * 10 # 每次處理10天的資料
             for year in range(2023, 2024 + 1) :
                 min_UTC, max_UTC = get_UTC_range(year)
+                if min_UTC == None or max_UTC == None :
+                    continue
                 run_times = (max_UTC - min_UTC) // time_width + 1
                 current_min_UTC = min_UTC
                 current_max_UTC = min(min_UTC + time_width, max_UTC)
