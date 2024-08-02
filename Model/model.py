@@ -66,7 +66,7 @@ class Model:
         performance = permutation_importance(self.my_model, self.x_test, self.y_test, n_repeats=10, random_state=0)
         for i in performance.importances_mean.argsort()[::-1]:
             if performance.importances_mean[i] - 2 * performance.importances_std[i] > 0:
-                print(f"{x.columns[i]:<21}"
+                print(f"{self.x_train.columns[i]:<21}"
                     f"{performance.importances_mean[i]:.3f}"
                     f" +/- {performance.importances_std[i]:.3f}")
         print("--------------------end--------------------\n")
