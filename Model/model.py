@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 import joblib
 import os
+import modin.pandas as mpd
 
 from sklearn.inspection import permutation_importance
 from sklearn.datasets import load_diabetes
@@ -10,11 +11,11 @@ from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 
 class Model:
-    my_model=None
-    x_train=None
-    x_test=None
-    y_train=None
-    y_test=None
+    my_model = None
+    x_train = pd.DataFrame()
+    x_test = pd.DataFrame()
+    y_train = pd.DataFrame()
+    y_test = pd.DataFrame()
 
     def __init__(self):
         pass
@@ -27,7 +28,6 @@ class Model:
             model is imported and saved by 'path' variable, change it to load/save model correctly!
         
         input:
-            
             model parameters: 
                 _n_estimator:      an integer indicate the number of decision tree in random forest
                 _max_features:     {'sqrt', 'log2', None}, an integer or a float, indicate the number of maximal features in a tree
@@ -56,11 +56,18 @@ class Model:
             print("model saved, at ", path)
 
     def test(self):
-        y_pred = self.my_model.predict(self.x_test)
+        y_pred_train = self.my_model.predict(self.x_train)
+        y_pred_test = self.my_model.predict(self.x_test)
+
         print("------------------Results------------------")
-        print("Mean Squared Error: ", mean_squared_error(self.y_test, y_pred))
-        print("Mean Absolute Error:", mean_absolute_error(self.y_test, y_pred))
-        print("R^2 Score:          ", r2_score(self.y_test, y_pred))
+        print("For train dataset:")
+        print("  Mean Squared Error: ", mean_squared_error(self.y_test, y_pred_train))
+        print("  Mean Absolute Error:", mean_absolute_error(self.y_test, y_pred_train))
+        print("  R^2 Score:          ", r2_score(self.y_test, y_pred_train))
+        print("For test dataset:")
+        print("  Mean Squared Error: ", mean_squared_error(self.y_test, y_pred_test))
+        print("  Mean Absolute Error:", mean_absolute_error(self.y_test, y_pred_test))
+        print("  R^2 Score:          ", r2_score(self.y_test, y_pred_test))
         
         print("------------Feature importances------------")
         performance = permutation_importance(self.my_model, self.x_test, self.y_test, n_repeats=10, random_state=0)
@@ -77,9 +84,9 @@ class Model:
         file_path = os.path.join(current_dir_path, file_name)
         return file_path
 
-    def test_model_with_diabetes(self):
+    def import_diabetes(self):
         """
-        test model training and testing function with example dataset 'diabetes'
+        import example dataset 'diabetes'
         """
         path = "random_forest.joblib"
         diabete = load_diabetes()
@@ -87,27 +94,27 @@ class Model:
         y = diabete.target
 
         self.x_train, self.x_test, self.y_train, self.y_test = train_test_split(x, y, test_size=0.2)
-
-        print("testing training model...")
-        self.train(_n_estimator=100, _max_features=None, _max_depth=None, _min_samples_leaf=1, import_model=False, save_model=True, path=path)
-        self.test()
-
-        print("testing importing model...")
-        self.train(_n_estimator=100, _max_features=None, _max_depth=None, _min_samples_leaf=1, import_model=True, save_model=False, path=path)
-        self.test()
     
-    def test_model_with_freeway(self, df, __n_estimators=100, __max_features=None, __max_depth=None, __min_samples_leaf=1, _import_model=False, _save_model=True):
+    def import_freeway(self, mdf):
         """
-        train and test model with freeway dataset
+        import freeway dataset
+
+        input:
+            mdf: a modin dataframe with data
         """
-        train_data=df.query("year=2023")
-        test_data=df.query("year=2024")
+        train_data_mdf = mpd.DataFrame()
+        test_data_mdf = mpd.DataFrame()
+        
+        train_data_mdf = mdf.query("year=2023")
+        test_data_mdf = mdf.query("year=2024")
 
-        self.x_train=train_data.loc[:, df.columns != 'speed']
-        self.x_test=test_data.loc[:, df.columns != 'speed']
-        self.y_train=train_data['speed']
-        self.y_test=test_data['speed']
+        train_data = train_data_mdf._to_pandas()
+        test_data = test_data_mdf._to_pandas()
 
-        print("training model...")
-        self.train( _n_estimators=__n_estimators, _max_features=__max_features, _max_depth=__max_depth, _min_samples_leaf=__min_samples_leaf, import_model=_import_model, save_model=_save_model, path="random_forest.joblib")
-        self.test()
+        self.x_train = train_data.loc[:, pd.df.columns != 'speed']
+        self.x_test = test_data.loc[:, pd.df.columns != 'speed']
+        self.y_train = train_data['speed']
+        self.y_test = test_data['speed']
+
+    def get_model(self):
+        return self.my_model
