@@ -9,7 +9,12 @@ from sklearn.datasets import load_diabetes
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
-
+"""
+How to use:
+    1. call import_freeway() or import_diabetes() to save train and test dataset as a member variable in this class
+    2. call train() to train model
+    3. call test() to get result
+"""
 class Model:
     my_model = None
     x_train = pd.DataFrame()
@@ -105,14 +110,14 @@ class Model:
         train_data_mdf = mpd.DataFrame()
         test_data_mdf = mpd.DataFrame()
         
-        train_data_mdf = mdf.query("year=2023")
-        test_data_mdf = mdf.query("year=2024")
+        train_data_mdf = mdf.query('year=2023')
+        test_data_mdf = mdf.query('year=2024')
 
         train_data = train_data_mdf._to_pandas()
         test_data = test_data_mdf._to_pandas()
 
-        self.x_train = train_data.loc[:, pd.df.columns != 'speed']
-        self.x_test = test_data.loc[:, pd.df.columns != 'speed']
+        self.x_train = train_data.loc[:, train_data.columns != 'speed']
+        self.x_test = test_data.loc[:, test_data.columns != 'speed']
         self.y_train = train_data['speed']
         self.y_test = test_data['speed']
 
