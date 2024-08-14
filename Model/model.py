@@ -3,12 +3,16 @@ import pandas as pd
 import joblib
 import os
 import modin.pandas as mpd
+from scipy.stats import randint
 
 from sklearn.inspection import permutation_importance
 from sklearn.datasets import load_diabetes
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
+from sklearn.experimental import enable_halving_search_cv  # noqa
+from sklearn.model_selection import train_test_split, HalvingRandomSearchCV, HalvingGridSearchCV
+
 """
 How to use:
     1. call import_freeway() or import_diabetes() to save train and test dataset as a member variable in this class
@@ -123,6 +127,78 @@ class Model:
         path = self.__get_path (os.path.join(directory, "record.txt"))
         with open(path, 'a') as f:
             f.write(content + '\n')
+
+# include constant hyperparameters
+    def train_grid_search(self, save_model=True, file_name=""):
+        os.makedirs(self.__get_path ('models/'), exist_ok=True)
+        name, _ = os.path.splitext(file_name)
+        path = self.__get_path ('models/' + name + '/' + file_name)
+        path = self.__rename_and_create_folder(path)
+        
+        clf = RandomForestRegressor(random_state=0)
+        param_grid = {
+            "n_estimators": [300, 400, 500],
+            "max_features": ["sqrt", "log2", None],
+            "max_depth": [3, None],
+            "min_samples_leaf": [2, 4, 8, 16]
+        }
+        search = HalvingGridSearchCV(clf, param_grid, random_state=0)
+
+        self.my_model = search.fit(self.x_train, self.y_train)
+        self.model_path = ""
+
+        if save_model:
+            joblib.dump(self.my_model, path)
+            self.model_path = path
+            columns = self.x_train.columns.tolist()
+            params = search.best_params_  
+            content = "RandomForestRegressor with Grid Search\n"
+            for key in params.keys():
+                content += key + ": " + str(params[key]) + "\n"
+            content += "features: \n"
+            for column in columns:
+                content += "  " + column + "\n"
+            self.__record(content)
+            print("Model saved, at ", path)
+
+# include constant hyperparameters
+    def train_halving_random (self, save_model=True, file_name=""):
+        os.makedirs(self.__get_path ('models/'), exist_ok=True)
+        name, _ = os.path.splitext(file_name)
+        path = self.__get_path ('models/' + name + '/' + file_name)
+        path = self.__rename_and_create_folder(path)
+        
+        clf = RandomForestRegressor(random_state=0)
+        param_grid = {
+            "max_features": ["sqrt", "log2", None],
+            "max_depth": [int(x) for x in np.linspace(start=20, stop=100, num=10)],
+            "min_samples_leaf": [int(x) for x in np.linspace(start=2, stop=1024, num=10)]
+        }
+        search = HalvingRandomSearchCV(
+            clf, 
+            param_grid, 
+            resource='n_estimators', 
+            min_resources=50,
+            max_resources=500, 
+            random_state=0
+        )
+
+        self.my_model = search.fit(self.x_train, self.y_train)
+        self.model_path = ""
+
+        if save_model:
+            joblib.dump(self.my_model, path)
+            self.model_path = path
+            columns = self.x_train.columns.tolist()
+            params = search.best_params_  
+            content = "RandomForestRegressor with Halving Random Forest\n"
+            for key in params.keys():
+                content += key + ": " + str(params[key]) + "\n"
+            content += "features: \n"
+            for column in columns:
+                content += "  " + column + "\n"
+            self.__record(content)
+            print("Model saved, at ", path)
 
     def import_model(self, file_name):
         name, _ = os.path.splitext(file_name)
