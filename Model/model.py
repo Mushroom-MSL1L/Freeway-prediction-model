@@ -17,6 +17,7 @@ How to use:
 """
 class Model:
     my_model = None
+    model_path = ""
     x_train = pd.DataFrame()
     x_test = pd.DataFrame()
     y_train = pd.DataFrame()
@@ -25,7 +26,7 @@ class Model:
     def __init__(self):
         pass
 
-    def train(self, _n_estimators, _max_features, _max_depth, _min_samples_leaf, import_model=False, save_model=True, path=""):
+    def train(self, _n_estimators, _max_features, _max_depth, _min_samples_leaf, save_model=True, file_name=""):
         """
         train the model
 
@@ -44,20 +45,26 @@ class Model:
             save_model:   a boolean indicate whether model is saved to 'path' variable 
         """
         os.makedirs(self.__get_path ('models/'), exist_ok=True)
-        path = self.__get_path ('models/' + path)
+        name, _ = os.path.splitext(file_name)
+        path = self.__get_path ('models/' + name + '/' + file_name)
         
-        if import_model:
-            try :
-                self.my_model = joblib.load(path)
-                print("model imported")
-            except:
-                raise ValueError("model not found")
-        else:
-            self.my_model = RandomForestRegressor(n_estimators=_n_estimators, max_features=_max_features, max_depth=_max_depth, min_samples_leaf=_min_samples_leaf)
-            self.my_model.fit(self.x_train, self.y_train)
+        path = self.__rename_and_create_folder(path)
+        self.my_model = RandomForestRegressor(n_estimators=_n_estimators, max_features=_max_features, max_depth=_max_depth, min_samples_leaf=_min_samples_leaf)
+        self.my_model = self.my_model.fit(self.x_train, self.y_train)
 
         if save_model:
             joblib.dump(self.my_model, path)
+            self.model_path = path
+            columns = self.x_train.columns.tolist()
+            content = "RandomForestRegressor\n"
+            content += "n_estimators: " + str(_n_estimators) + "\n"
+            content += "max_features: " + str(_max_features) + "\n"
+            content += "max_depth: " + str(_max_depth) + "\n"
+            content += "min_samples_leaf: " + str(_min_samples_leaf) + "\n"
+            content += "features: \n"
+            for column in columns:
+                content += "  " + column + "\n"
+            self.__record(content)
             print("model saved, at ", path)
 
     def test(self):
@@ -89,6 +96,33 @@ class Model:
         file_path = os.path.join(current_dir_path, file_name)
         return file_path
 
+    def __rename_and_create_folder(self, file_path):
+        directory, original_filename = os.path.split(file_path)
+        parent_directory = os.path.dirname(directory)
+        name, ext = os.path.splitext(original_filename)
+        
+        new_filename = original_filename
+        new_folder = name
+        counter = 0
+        
+        while os.path.exists(os.path.join(parent_directory, new_folder, new_filename)):
+            counter += 1
+            new_filename = f"{name}_{counter}{ext}"
+            new_folder = f"{name}_{counter}"
+        
+        new_file_path = os.path.join(parent_directory, new_folder, new_filename)
+        os.makedirs(os.path.join(parent_directory, new_folder), exist_ok=True)
+        return new_file_path
+    def import_model(self, file_name):
+        name, _ = os.path.splitext(file_name)
+        path = self.__get_path ('models/' + name + '/' + file_name)
+        try :
+            self.my_model = joblib.load(path)
+            self.model_path = path
+            print("model imported from ", file_name)
+        except:
+            raise ValueError("model not found")
+
     def import_diabetes(self):
         """
         import example dataset 'diabetes'
@@ -100,7 +134,7 @@ class Model:
 
         self.x_train, self.x_test, self.y_train, self.y_test = train_test_split(x, y, test_size=0.2)
     
-    def import_freeway(self, mdf):
+    def import_freeway(self, mdf, target_column, column_needed):
         """
         import freeway dataset
 
@@ -110,16 +144,21 @@ class Model:
         train_data_mdf = mpd.DataFrame()
         test_data_mdf = mpd.DataFrame()
         
-        train_data_mdf = mdf.query('year=2023')
-        test_data_mdf = mdf.query('year=2024')
+        train_data_mdf = mdf.query('year == 2023')
+        test_data_mdf = mdf.query('year == 2024')
 
-        train_data = train_data_mdf._to_pandas()
-        test_data = test_data_mdf._to_pandas()
+        train_data = train_data_mdf[column_needed]._to_pandas()
+        test_data = test_data_mdf[column_needed]._to_pandas()
 
-        self.x_train = train_data.loc[:, train_data.columns != 'speed']
-        self.x_test = test_data.loc[:, test_data.columns != 'speed']
-        self.y_train = train_data['speed']
-        self.y_test = test_data['speed']
+        self.y_train = train_data[target_column]
+        self.y_test = test_data[target_column]
+
+        self.x_train = train_data.drop(columns=[target_column])
+        self.x_test = test_data.drop(columns=[target_column])
+        print("freeway imported")
 
     def get_model(self):
         return self.my_model
+
+    def get_model_path(self):
+        return self.model_path
