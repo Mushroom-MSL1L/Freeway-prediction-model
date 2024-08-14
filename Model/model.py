@@ -4,6 +4,8 @@ import joblib
 import os
 import modin.pandas as mpd
 from scipy.stats import randint
+from datetime import datetime, timezone, timedelta
+
 
 from sklearn.inspection import permutation_importance
 from sklearn.datasets import load_diabetes
@@ -26,6 +28,7 @@ class Model:
     x_test = pd.DataFrame()
     y_train = pd.DataFrame()
     y_test = pd.DataFrame()
+    x_original_test = pd.DataFrame()
 
     def __init__(self):
         pass
@@ -214,17 +217,35 @@ class Model:
             if x.shape[0] < n:
                 raise ValueError("query result is less than n")
             x = x.sample(n)
+        elif type == 'all':
+            x = self.x_test
         else:
             raise ValueError("type must be 'random' or 'query'")
+        
         pred_y = self.my_model.predict(x)
         real_y = self.y_test[x.index]
         print("features: ", x.columns.tolist())
+
+        results = x.copy()
+        results['Predicted'] = pred_y
+        results['Real'] = real_y.values
+        results.to_csv('prediction_results.csv', index=False)
 
         for i in range(min(n, x.shape[0])):
             print("Data ", i)
             print("Features: ", x.iloc[i])
             print("Predicted: ", pred_y[i], " Real: ", real_y.iloc[i])
         return x, pred_y, real_y
+
+    def predict_all_and_export(self):
+        pred_y = self.my_model.predict(self.x_test)
+        results = self.x_original_test.copy()
+        base_time = datetime(1970, 1, 1, tzinfo=timezone.utc)
+        results['utc'] = results['utc'].apply(lambda x: base_time + timedelta(seconds=x))
+        results['Predicted_speed'] = pred_y
+        results['Real_speed'] = self.y_test.values
+        results = results.sort_values(by=['utc'], ascending=True)
+        results.to_csv('prediction_results.csv', index=False)
 
     def import_model(self, file_name):
         name, _ = os.path.splitext(file_name)
@@ -259,6 +280,8 @@ class Model:
         
         train_data_mdf = mdf.query('year == 2023')
         test_data_mdf = mdf.query('year == 2024')
+
+        self.x_original_test = test_data_mdf.copy()
 
         train_data = train_data_mdf[column_needed]._to_pandas()
         test_data = test_data_mdf[column_needed]._to_pandas()

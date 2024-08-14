@@ -96,3 +96,5 @@ if __name__ == "__main__":
     # query = f"car == {car_code}"
     # m.predict(query=query, n=10, type="query_random")
     
+    m.import_model("01F0928N_01F0880N_halving_random.joblib")
+    m.predict_all_and_export()
