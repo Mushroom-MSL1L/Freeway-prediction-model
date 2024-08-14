@@ -70,25 +70,29 @@ class Model:
     def test(self):
         y_pred_train = self.my_model.predict(self.x_train)
         y_pred_test = self.my_model.predict(self.x_test)
+        content = ""
 
-        print("------------------Results------------------")
-        print("For train dataset:")
-        print("  Mean Squared Error: ", mean_squared_error(self.y_test, y_pred_train))
-        print("  Mean Absolute Error:", mean_absolute_error(self.y_test, y_pred_train))
-        print("  R^2 Score:          ", r2_score(self.y_test, y_pred_train))
-        print("For test dataset:")
-        print("  Mean Squared Error: ", mean_squared_error(self.y_test, y_pred_test))
-        print("  Mean Absolute Error:", mean_absolute_error(self.y_test, y_pred_test))
-        print("  R^2 Score:          ", r2_score(self.y_test, y_pred_test))
-        
-        print("------------Feature importances------------")
+        content += self.model_path + "\n"
+        content += "------------------Results------------------\n"
+        content += "For train dataset:\n"
+        content += "  Mean Squared Error: " + str(mean_squared_error(self.y_train, y_pred_train)) + "\n"
+        content += "  Mean Absolute Error:" + str(mean_absolute_error(self.y_train, y_pred_train)) + "\n"
+        content += "  R^2 Score:          " + str(r2_score(self.y_train, y_pred_train)) + "\n"
+        content += "For test dataset:\n"
+        content += "  Mean Squared Error: " + str(mean_squared_error(self.y_test, y_pred_test)) + "\n"
+        content += "  Mean Absolute Error:" + str(mean_absolute_error(self.y_test, y_pred_test)) + "\n"
+        content += "  R^2 Score:          " + str(r2_score(self.y_test, y_pred_test)) + "\n"
+
+        content += "------------Feature importances------------\n"
         performance = permutation_importance(self.my_model, self.x_test, self.y_test, n_repeats=10, random_state=0)
         for i in performance.importances_mean.argsort()[::-1]:
             if performance.importances_mean[i] - 2 * performance.importances_std[i] > 0:
-                print(f"{self.x_train.columns[i]:<21}"
-                    f"{performance.importances_mean[i]:.3f}"
-                    f" +/- {performance.importances_std[i]:.3f}")
-        print("--------------------end--------------------\n")
+                content += f"{self.x_train.columns[i]:<21}" \
+                            f"{performance.importances_mean[i]:.3f}" \
+                            f" +/- {performance.importances_std[i]:.3f}\n"
+        content += "--------------------end--------------------\n"
+        print(content)
+        self.__record(content)
 
     def __get_path (self, file_name):
         current_file_path = os.path.realpath(__file__)
@@ -113,6 +117,13 @@ class Model:
         new_file_path = os.path.join(parent_directory, new_folder, new_filename)
         os.makedirs(os.path.join(parent_directory, new_folder), exist_ok=True)
         return new_file_path
+
+    def __record(self, content):
+        directory, original_filename = os.path.split(self.model_path)
+        path = self.__get_path (os.path.join(directory, "record.txt"))
+        with open(path, 'a') as f:
+            f.write(content + '\n')
+
     def import_model(self, file_name):
         name, _ = os.path.splitext(file_name)
         path = self.__get_path ('models/' + name + '/' + file_name)
