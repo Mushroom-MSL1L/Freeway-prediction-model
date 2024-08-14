@@ -259,7 +259,7 @@ holiday[2] = [  0,
 # Construction : 2023/1/1 7:45
 # function format : YYYY-MM-DDTHH:MM:SS...
 
-def modified_holiday_and_date_cosine_processor(year, month, day, five_minute):
+def modified_holiday_and_date_cosine_processor(year, month, day, five_minute, weekday):
     '''
     Given a valid time, return whether it is holiday or weekend, and its value after cosine transformation
 
@@ -274,11 +274,12 @@ def modified_holiday_and_date_cosine_processor(year, month, day, five_minute):
         month:      a float represent its value in a year after sine transformation (resolution is month)
         day:        a float represent its value in a year after sine transformation (resolution is day)
         minute:     a float represent its value in a day after sine transformation (resolution is 5 minute)
+        weekday:    a float represent its value in a week after sine transformation (resolution is day)
     '''
 
     is_holiday = False
     is_weekend = False
-    _holiday = 0.0
+    _holiday = 1.0
 
     date_time = datetime(year, month, day, five_minute // 12, (five_minute % 12) * 5)
     date = days[date_time.month] + date_time.day
@@ -292,13 +293,40 @@ def modified_holiday_and_date_cosine_processor(year, month, day, five_minute):
     month = np.cos(2 * np.pi * (date_time.month / 12))
     day = np.cos(2 * np.pi * (date / 365))
     minute = np.cos(2 * np.pi * ((date_time.hour * 12 + date_time.minute / 5) / 288))
+    weekday = np.cos(2 * np.pi * (weekday / 7))
 
     # deal with 'no sine transformation value' scenario
     if holiday[2][index] == 0 or holiday[1][index] + date_time.hour <= 0 or holiday[1][index] + date_time.hour >= holiday[2][index]:
-        return is_weekend, is_holiday, _holiday, month, day, minute
+        return is_weekend, is_holiday, _holiday, month, day, minute, weekday
     
     _holiday = np.cos(2 * np.pi * ((holiday[1][index] + date_time.hour) / holiday[2][index]))
-    return is_weekend, is_holiday, _holiday, month, day, minute
+    return is_weekend, is_holiday, _holiday, month, day, minute, weekday
+
+def modified_holiday_and_date_sine_processor(year, month, day, five_minute, weekday):
+    is_holiday = False
+    is_weekend = False
+    _holiday = 0.0
+
+    date_time = datetime(year, month, day, five_minute // 12, (five_minute % 12) * 5)
+    date = days[date_time.month] + date_time.day
+    index = (date_time.year - 2023) * 365 + date
+
+    if holiday[0][index] == 1:
+        is_holiday = True
+    elif holiday[0][index] == 2:
+        is_weekend = True
+    
+    month = np.sin(2 * np.pi * (date_time.month / 12))
+    day = np.sin(2 * np.pi * (date / 365))
+    minute = np.sin(2 * np.pi * ((date_time.hour * 12 + date_time.minute / 5) / 288))
+    weekday = np.sin(2 * np.pi * (weekday / 7))
+
+    # deal with 'no sine transformation value' scenario
+    if holiday[2][index] == 0 or holiday[1][index] + date_time.hour <= 0 or holiday[1][index] + date_time.hour >= holiday[2][index]:
+        return is_weekend, is_holiday, _holiday, month, day, minute, weekday
+    
+    _holiday = np.sin(2 * np.pi * ((holiday[1][index] + date_time.hour) / holiday[2][index]))
+    return is_weekend, is_holiday, _holiday, month, day, minute, weekday
 
 def holiday_and_date_sine_processor(start_time):
     '''
