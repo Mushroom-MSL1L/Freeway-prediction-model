@@ -69,6 +69,7 @@ def convert_and_store_ETagPairLive(store_path, conn, car_code_needed, segment_id
             Year            INTEGER,
             Month           INTEGER,
             Day             INTEGER,
+            Weekday         INTEGER,
             FiveMinute      INTEGER,
             VehicleType     INTEGER,
             SpaceMeanSpeed  INTEGER,
@@ -123,20 +124,21 @@ def convert_and_store_ETagPairLive(store_path, conn, car_code_needed, segment_id
                 continue
             # process ETagPairID to highway, start_mileage, end_mileage, direction
             highway, start_mileage, end_mileage, direction = parse_ETagPairID(etag_pair_id)
-            # process time to year, month, day, five_minute
+            # process time to year, month, day, five_minute, weekday
             dt = datetime.fromisoformat(start_time).replace(tzinfo=timezone.utc)
             year = dt.year
             month = dt.month
             day = dt.day
+            weekday = dt.weekday()
             start_dt_of_day = dt
             start_dt_of_day = start_dt_of_day.replace(hour=0, minute=0, second=0, microsecond=0)
             five_minute = int((dt - start_dt_of_day).seconds / 300) # 5 min = 300 sec
             UTC = int(dt.timestamp())
             # store data to database as ETagPairLive schema
             c.execute('''
-                INSERT INTO ETagPairLive (ETagPairID, Highway, StartMileage, EndMileage, Direction, UTC, Year, Month, Day, FiveMinute, VehicleType, SpaceMeanSpeed, VehicleCount)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ''', (etag_pair_id, highway, start_mileage, end_mileage, direction, UTC, year, month, day, five_minute, vehicle_type, space_mean_speed, vehicle_count)
+                INSERT INTO ETagPairLive (ETagPairID, Highway, StartMileage, EndMileage, Direction, UTC, Year, Month, Day, FiveMinute, Weekday, VehicleType, SpaceMeanSpeed, VehicleCount)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (etag_pair_id, highway, start_mileage, end_mileage, direction, UTC, year, month, day, five_minute, weekday, vehicle_type, space_mean_speed, vehicle_count)
             )
     conn.db.commit()
     # end of convert_and_store_ETagPairLive function

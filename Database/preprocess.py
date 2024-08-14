@@ -1,5 +1,5 @@
 from .get_data import GetData
-from .holiday import modified_holiday_and_date_cosine_processor
+from .holiday import modified_holiday_and_date_cosine_processor, modified_holiday_and_date_sine_processor
 import modin.pandas as mpd
 import pandas as pd
 from tqdm import tqdm as tqdm
@@ -252,14 +252,14 @@ class Preprocess():
         '''
         def map_vehicle_type(row, car_map):
             return car_map[row['VehicleType']]
-
+        
         df = self.query_in_batches(load_ETagePair_query, self.processed_db.db)
         # change vehicle type to the frequency
         df['VehicleType'] = df.apply(map_vehicle_type, car_map=self.car_map, axis=1)
 
         # aggregate same vehicle type
         df = df.groupby([
-            'ETagPairID', 'Highway', 'StartMileage', 'EndMileage', 'Direction', 'UTC', 'Year', 'Month', 'Day', 'FiveMinute', 'VehicleType'
+            'ETagPairID', 'Highway', 'StartMileage', 'EndMileage', 'Direction', 'UTC', 'Year', 'Month', 'Day', 'FiveMinute', 'Weekday', 'VehicleType'
         ]).agg({
             'SpaceMeanSpeed': 'mean',
             'VehicleCount': 'sum'
@@ -309,6 +309,7 @@ SELECT
     ETagPairLive_temp.Year, 
     ETagPairLive_temp.Month, 
     ETagPairLive_temp.Day, 
+    ETagPairLive_temp.Weekday,
     ETagPairLive_temp.FiveMinute, 
     ETagPairLive_temp.VehicleType, 
     ETagPairLive_temp.SpaceMeanSpeed, 
@@ -400,6 +401,7 @@ SELECT
     ETagPairLive_temp.Year, 
     ETagPairLive_temp.Month, 
     ETagPairLive_temp.Day, 
+    ETagPairLive_temp.Weekday,
     ETagPairLive_temp.FiveMinute, 
     ETagPairLive_temp.VehicleType, 
     ETagPairLive_temp.SpaceMeanSpeed, 
@@ -463,7 +465,10 @@ AND (
     def __load_holiday(self, segment_id, temp_df, show_progress=True) :
         if show_progress:
             print("\tHoliday is preprocessing.")
-        temp_df['is_weekend'], temp_df['is_holiday'], temp_df['Holiday'], temp_df['Month'], temp_df['Day'], temp_df['FiveMinute'] = zip(*temp_df.apply(lambda row : modified_holiday_and_date_cosine_processor( row['Year'], row['Month'], row['Day'], row['FiveMinute']), axis=1))
+        temp_df['is_weekend'], temp_df['is_holiday'], temp_df['holiday_cos'], temp_df['month_cos'], temp_df['day_cos'], temp_df['five_minute_cos'], temp_df['weekday_cos'] \
+            = zip(*temp_df.apply(lambda row : modified_holiday_and_date_cosine_processor( row['Year'], row['Month'], row['Day'], row['FiveMinute'], row['Weekday']), axis=1))
+        temp_df['is_weekend'], temp_df['is_holiday'], temp_df['holiday_sin'], temp_df['month_sin'], temp_df['day_sin'], temp_df['five_minute_sin'], temp_df['weekday_sin'] \
+            = zip(*temp_df.apply(lambda row : modified_holiday_and_date_sine_processor( row['Year'], row['Month'], row['Day'], row['FiveMinute'], row['Weekday']), axis=1))
         
         if show_progress:
             print("\tHoliday is preprocessed and loaded.")
@@ -486,13 +491,19 @@ CREATE TABLE IF NOT EXISTS preprocessed_data (
 
     utc INTEGER,
 
-    month FLOAT,
-    day FLOAT,
-    five_minute FLOAT,
+    month_sin FLOAT,
+    month_cos FLOAT,
+    day_sin FLOAT,
+    day_cos FLOAT,
+    five_minute_sin FLOAT,
+    five_minute_cos FLOAT,
+    weekday_sin FLOAT,
+    weekday_cos FLOAT,
 
     is_weekend BOOLEAN,
     is_holiday BOOLEAN,
-    holiday FLOAT,
+    holiday_sin FLOAT,
+    holiday_cos FLOAT,
 
     has_accident BOOLEAN,
     recovery_time INTEGER,
@@ -525,7 +536,8 @@ CREATE TABLE IF NOT EXISTS preprocessed_data (
 
         column_needed = [ 'UTC',
             'ETagPairID', 'Direction', 'Highway', 'StartMileage', 'EndMileage', 'VehicleType', 'SpaceMeanSpeed', 
-            'Year', 'Month', 'Day', 'FiveMinute', 'is_weekend', 'is_holiday', 'Holiday',
+            'Year', 'month_sin', 'month_cos', 'day_sin', 'day_cos', 'five_minute_sin', 'five_minute_cos', 'weekday_sin', 'weekday_cos',
+            'is_weekend', 'is_holiday', 'holiday_sin', 'holiday_cos',
             'is_accident', 'RecoveryMinute', 'traffic_accident_內路肩', 'traffic_accident_內車道', 'traffic_accident_中內車道', 'traffic_accident_中車道', 'traffic_accident_中外車道', 'traffic_accident_外車道', 'traffic_accident_外路肩', 'traffic_accident_匝道',
             'is_construction', 'ConstructionMinute', '第1車道', '第2車道', '第3車道', '第4車道', '第5車道', '第6車道', '第7車道', '第8車道', 'construction_外側路肩', 'construction_內邊坡', 'construction_外邊坡'
         ]
@@ -536,10 +548,6 @@ CREATE TABLE IF NOT EXISTS preprocessed_data (
             'EndMileage': 'end_mileage',
 
             'Year': 'year',
-            'Month': 'month',
-            'Day': 'day',
-            'FiveMinute': 'five_minute',
-
             'VehicleType': 'car',
             'SpaceMeanSpeed': 'speed',
 
