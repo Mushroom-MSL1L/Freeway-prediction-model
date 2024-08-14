@@ -35,8 +35,8 @@ if __name__ == "__main__":
         {"ID" : "01F0980S-01F1045S", "from" : "新竹(科學工業園區)-新竹系統", "to" : "新竹系統-頭份"},
     ]
     car_code_needed = [31, 32, 41, 42, 5] # 31小客車 32小貨車 41大客車 42大貨車 5聯結車
-    already_fetched         = False
-    already_preprocessed    = False
+    already_fetched         = True
+    already_preprocessed    = True
     
     preprocess_var = Preprocess(segment_id_needed, car_code_needed, already_fetched, already_preprocessed)
     preprocessed_data = preprocess_var.get_preprocessed_data()
@@ -44,6 +44,55 @@ if __name__ == "__main__":
     print(preprocessed_data.head())
     print(car_map)
 
-    # m = Model()
-    # m.test_model_with_diabetes()
+    m = Model()
+    all_columns = [ 'UTC',
+            'ETagPairID', 'direction', 'highway', 'start_mileage', 'end_mileage', 'car', 'speed', 
+            'year', 'month', 'day', 'five_minute', 'is_weekend', 'is_holiday', 'holiday',
+            'has_accident', 'recovery_time', 'traffic_accident_內路肩', 'traffic_accident_內車道', 'traffic_accident_中內車道', 'traffic_accident_中車道', 'traffic_accident_中外車道', 'traffic_accident_外車道', 'traffic_accident_外路肩', 'traffic_accident_匝道',
+            'has_construction', 'construction_time', 'construction_第一車道', 'construction_第二車道', 'construction_第三車道', 'construction_第四車道', 'construction_第五車道', 'construction_第六車道', 'construction_第七車道', 'construction_第八車道', 'construction_外側路肩', 'construction_內邊坡', 'construction_外邊坡'
+        ]
+    column_needed = [
+        'car', 
+        'speed',
+        # 'month', 'day', 
+        'five_minute', 
+        'is_weekend', 
+        # 'is_holiday', 
+        'holiday', 
+        # 'has_accident', 
+        'recovery_time', 
+        # 'traffic_accident_內路肩', 'traffic_accident_內車道', 'traffic_accident_中內車道', 'traffic_accident_中車道', 'traffic_accident_中外車道', 'traffic_accident_外車道', 'traffic_accident_外路肩', 'traffic_accident_匝道', 
+        # 'has_construction', 
+        'construction_time', 
+        # 'construction_第一車道', 'construction_第二車道', 'construction_第三車道', 'construction_第四車道', 'construction_第五車道', 'construction_第六車道', 'construction_第七車道', 'construction_第八車道', 'construction_外側路肩', 'construction_內邊坡', 'construction_外邊坡'
+        ]
+    first_data = preprocessed_data.query(f"ETagPairID == '01F0928N-01F0880N'")
+
+    m.import_freeway(first_data, 'speed', column_needed)
+    # m.train(
+    #     _n_estimators=100, 
+    #     _max_features=None, 
+    #     _max_depth=None, 
+    #     _min_samples_leaf=1, 
+    #     save_model=True, 
+    #     file_name="01F0928N_01F0880N.joblib"
+    # )
+    # m.train_halving_random(
+    #     save_model=True, 
+    #     file_name="01F0928N_01F0880N_halving_random.joblib"
+    # )
+    # m.train_grid_search(
+    #     save_model=True, 
+    #     file_name="01F0928N_01F0880N_grid_search.joblib"
+    # )
+    m.train_halving_random(
+        save_model=True, 
+        file_name="01F0928N_01F0880N_halving_random.joblib"
+    )
+    m.test()
+
+    # m.import_model("01F0928N_01F0880N_halving_random_8.joblib")
+    # car_code = car_map[31]
+    # query = f"car == {car_code}"
+    # m.predict(query=query, n=10, type="query_random")
     
