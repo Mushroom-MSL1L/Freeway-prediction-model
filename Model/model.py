@@ -7,11 +7,11 @@ from scipy.stats import randint
 
 from sklearn.inspection import permutation_importance
 from sklearn.datasets import load_diabetes
-from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 from sklearn.experimental import enable_halving_search_cv  # noqa
 from sklearn.model_selection import train_test_split, HalvingRandomSearchCV, HalvingGridSearchCV
+
 
 """
 How to use:
@@ -199,6 +199,32 @@ class Model:
                 content += "  " + column + "\n"
             self.__record(content)
             print("Model saved, at ", path)
+
+    def predict(self, query, n = 1, type='random'):
+        if n < 1:
+            raise ValueError("n must be greater than 0")
+        if type == 'random':
+            x = self.x_test.sample(n)
+        elif type == 'query_const':
+            x = self.x_test.query(query).head(n)
+            if x.shape[0] < n:
+                raise ValueError("query result is less than n")
+        elif type == 'query_random':
+            x = self.x_test.query(query)
+            if x.shape[0] < n:
+                raise ValueError("query result is less than n")
+            x = x.sample(n)
+        else:
+            raise ValueError("type must be 'random' or 'query'")
+        pred_y = self.my_model.predict(x)
+        real_y = self.y_test[x.index]
+        print("features: ", x.columns.tolist())
+
+        for i in range(min(n, x.shape[0])):
+            print("Data ", i)
+            print("Features: ", x.iloc[i])
+            print("Predicted: ", pred_y[i], " Real: ", real_y.iloc[i])
+        return x, pred_y, real_y
 
     def import_model(self, file_name):
         name, _ = os.path.splitext(file_name)
