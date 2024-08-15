@@ -122,6 +122,8 @@ def convert_and_store_ETagPairLive(store_path, conn, car_code_needed, segment_id
                 continue
             if (etag_pair_id not in segment_ids) :
                 continue
+            if (space_mean_speed < 0) :
+                continue
             # process ETagPairID to highway, start_mileage, end_mileage, direction
             highway, start_mileage, end_mileage, direction = parse_ETagPairID(etag_pair_id)
             # process time to year, month, day, five_minute, weekday
