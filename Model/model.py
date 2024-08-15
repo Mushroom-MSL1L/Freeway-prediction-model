@@ -247,6 +247,12 @@ class Model:
         results = results.sort_values(by=['utc'], ascending=True)
         results.to_csv('prediction_results.csv', index=False)
 
+        def plot_figure(results):
+            results.set_index('utc', inplace=True)
+            results[['Real_speed', 'Predicted_speed']].plot(figsize=(10, 6), title='Real vs Predicted Speed Over Time')
+        
+        plot_figure(results)
+
     def import_model(self, file_name):
         name, _ = os.path.splitext(file_name)
         path = self.__get_path ('models/' + name + '/' + file_name)

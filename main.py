@@ -67,8 +67,8 @@ if __name__ == "__main__":
         # 'construction_第一車道', 'construction_第二車道', 'construction_第三車道', 'construction_第四車道', 'construction_第五車道', 'construction_第六車道', 'construction_第七車道', 'construction_第八車道', 'construction_外側路肩', 'construction_內邊坡', 'construction_外邊坡'
         ]
     first_data = preprocessed_data.query(f"ETagPairID == '01F0928N-01F0880N'")
-
-    m.import_freeway(first_data, 'speed', column_needed)
+    second_data = first_data.query(f"car == '31'")
+    m.import_freeway(second_data, 'speed', column_needed)
     # m.train(
     #     _n_estimators=100, 
     #     _max_features=None, 
@@ -85,11 +85,11 @@ if __name__ == "__main__":
     #     save_model=True, 
     #     file_name="01F0928N_01F0880N_grid_search.joblib"
     # )
-    m.train_halving_random(
-        save_model=True, 
-        file_name="01F0928N_01F0880N_halving_random.joblib"
-    )
-    m.test()
+    # m.train_halving_random(
+    #     save_model=True, 
+    #     file_name="01F0928N_01F0880N_halving_random.joblib"
+    # )
+    # m.test()
 
     # m.import_model("01F0928N_01F0880N_halving_random_8.joblib")
     # car_code = car_map[31]
