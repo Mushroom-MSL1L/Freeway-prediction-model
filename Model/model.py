@@ -238,12 +238,18 @@ class Model:
         return x, pred_y, real_y
 
     def predict_all_and_export(self):
+        def get_run_time (speed, mileage_a, mileage_b) :
+            if speed == 0:
+                return 0
+            return abs(mileage_a - mileage_b) / speed
         pred_y = self.my_model.predict(self.x_test)
         results = self.x_original_test.copy()
         base_time = datetime(1970, 1, 1, tzinfo=timezone.utc)
         results['utc'] = results['utc'].apply(lambda x: base_time + timedelta(seconds=x))
         results['Predicted_speed'] = pred_y
         results['Real_speed'] = self.y_test.values
+        results['Prediected_run_time'] = results.apply(lambda x: get_run_time(x['Predicted_speed'], x['start_mileage'], x['end_mileage']), axis=1)
+        results['Real_run_time'] = results.apply(lambda x: get_run_time(x['Real_speed'], x['start_mileage'], x['end_mileage']), axis=1)
         results = results.sort_values(by=['utc'], ascending=True)
         results.to_csv('prediction_results.csv', index=False)
 
