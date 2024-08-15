@@ -3,6 +3,7 @@ import pandas as pd
 import joblib
 import os
 import modin.pandas as mpd
+import matplotlib.pyplot as plt
 from scipy.stats import randint
 from datetime import datetime, timezone, timedelta
 
@@ -245,12 +246,12 @@ class Model:
         results['Predicted_speed'] = pred_y
         results['Real_speed'] = self.y_test.values
         results = results.sort_values(by=['utc'], ascending=True)
-        results.to_csv('prediction_results.csv', index=False)
+        # results.to_csv('prediction_results.csv', index=False)
 
         def plot_figure(results):
-            results.set_index('utc', inplace=True)
-            results[['Real_speed', 'Predicted_speed']].plot(figsize=(10, 6), title='Real vs Predicted Speed Over Time')
-        
+            results.plot(x='utc', y=['Predicted_speed', 'Real_speed'], title='Real vs Predicted Speed Over Time')
+            plt.show()
+
         plot_figure(results)
 
     def import_model(self, file_name):

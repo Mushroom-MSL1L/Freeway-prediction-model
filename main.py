@@ -67,7 +67,7 @@ if __name__ == "__main__":
         # 'construction_第一車道', 'construction_第二車道', 'construction_第三車道', 'construction_第四車道', 'construction_第五車道', 'construction_第六車道', 'construction_第七車道', 'construction_第八車道', 'construction_外側路肩', 'construction_內邊坡', 'construction_外邊坡'
         ]
     first_data = preprocessed_data.query(f"ETagPairID == '01F0928N-01F0880N'")
-    second_data = first_data.query(f"car == '31'")
+    second_data = first_data.query(f"car == 0.869")
     m.import_freeway(second_data, 'speed', column_needed)
     # m.train(
     #     _n_estimators=100, 
