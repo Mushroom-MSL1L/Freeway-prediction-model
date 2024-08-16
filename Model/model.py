@@ -245,14 +245,21 @@ class Model:
         results['utc'] = results['utc'].apply(lambda x: base_time + timedelta(seconds=x))
         results['Predicted_speed'] = pred_y
         results['Real_speed'] = self.y_test.values
+        results['Predicted_time'] = (16.5 / pred_y) * 60
+        results['Real_time'] = (16.5 / self.y_test.values) * 60
         results = results.sort_values(by=['utc'], ascending=True)
         # results.to_csv('prediction_results.csv', index=False)
 
         def plot_figure(results):
-            results.plot(x='utc', y=['Predicted_speed', 'Real_speed'], title='Real vs Predicted Speed Over Time')
+            results.plot(x='utc', y=['Predicted_speed', 'Real_speed'], title='Real vs Predicted Speed in 2024/01 And 2024/02')
+            plt.ylabel("speed(km/h)")
+            plt.show()
+            results.plot(x='utc', y=['Predicted_time', 'Real_time'], title='Real vs Predicted time in 2024/01 And 2024/02')
+            plt.ylabel("travel time(minute)")
             plt.show()
 
         plot_figure(results)
+
 
     def import_model(self, file_name):
         name, _ = os.path.splitext(file_name)
