@@ -93,6 +93,16 @@ class Preprocess():
             result = self.processed_db.db.execute(query, (year,)).fetchone()
             min_value, max_value = result
             return min_value, max_value
+        def check_is_in_database(min_UTC, max_UTC) :
+            query = '''
+                SELECT COUNT(*)
+                FROM preprocessed_data
+                WHERE UTC BETWEEN ? AND ?
+            '''
+            result = self.processed_db.db.execute(query, (min_UTC, max_UTC)).fetchone()[0]
+            if result > 0 :
+                return True, min_UTC, max_UTC
+            return True, min_UTC, max_UTC
         # check if the preprocessed data already exists
         if already_preprocessed:
             try:
