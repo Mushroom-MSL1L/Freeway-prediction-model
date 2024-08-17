@@ -252,6 +252,10 @@ class Model:
         results['Real_run_time'] = results.apply(lambda x: get_run_time(x['Real_speed'], x['start_mileage'], x['end_mileage']), axis=1)
         results = results.sort_values(by=['utc'], ascending=True)
         results.to_csv('prediction_results.csv', index=False)
+        print("prediction results exported")
+        filtered_results = results[results['Real_run_time'] != 0]
+        print("mape: ", np.mean(np.abs((filtered_results['Prediected_run_time'] - filtered_results['Real_run_time']) / filtered_results['Real_run_time']))*100, "%")
+
 
     def import_model(self, file_name):
         name, _ = os.path.splitext(file_name)
@@ -283,6 +287,8 @@ class Model:
         """
         train_data_mdf = mpd.DataFrame()
         test_data_mdf = mpd.DataFrame()
+
+        mdf = mdf[mdf[target_column] > 0]
         
         train_data_mdf = mdf.query('year == 2023')
         test_data_mdf = mdf.query('year == 2024')
