@@ -109,5 +109,23 @@ if __name__ == "__main__":
     # query = f"car == {car_code}"
     # m.predict(query=query, n=10, type="query_random")
     
-    # m.import_model("01F0928N_01F0880N_halving_random.joblib")
-    # m.predict_all_and_export()
+    # column_needed = [
+    #     'speed',
+    #     'car', 
+    #     'month_sin', 'month_cos', 'day_sin', 'day_cos',
+    #     'five_minute_sin', 'five_minute_cos',
+    #     'is_weekend', 
+    #     'weekday_sin', 'weekday_cos', 
+    #     'is_holiday', 
+    #     'holiday_sin', 'holiday_cos',
+    #     'has_accident', 
+    #     'recovery_time', 
+    #     'traffic_accident_內路肩', 'traffic_accident_內車道', 'traffic_accident_中內車道', 'traffic_accident_中車道', 'traffic_accident_中外車道', 'traffic_accident_外車道', 'traffic_accident_外路肩', 'traffic_accident_匝道', 
+    #     'has_construction', 
+    #     'construction_time', 
+    #     'construction_第一車道', 'construction_第二車道', 'construction_第三車道', 'construction_第四車道', 'construction_第五車道', 'construction_第六車道', 'construction_第七車道', 'construction_第八車道', 'construction_外側路肩', 'construction_內邊坡', 'construction_外邊坡'
+    #     ]
+    # first_data = preprocessed_data.query(f"ETagPairID == '01F0928N-01F0880N'")
+    # m.import_freeway(first_data, 'speed', column_needed)
+    # m.import_model("01F0928N_01F0880N_halving_random_10.joblib")
+    m.predict_all_and_export()

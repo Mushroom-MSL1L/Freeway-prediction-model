@@ -228,15 +228,16 @@ class Model:
         clf = RandomForestRegressor(random_state=0)
         param_grid = {
             "max_features": ["sqrt", "log2", None],
-            "max_depth": [int(x) for x in np.linspace(start=20, stop=100, num=10)],
-            "min_samples_leaf": [int(x) for x in np.linspace(start=2, stop=1024, num=10)]
+            "max_depth": [int(x) for x in np.linspace(start=20, stop=100, num=100)],
+            "min_samples_leaf": [int(x) for x in np.linspace(start=2, stop=256, num=100)]
         }
         search = HalvingRandomSearchCV(
             clf, 
             param_grid, 
             resource='n_estimators', 
-            min_resources=50,
+            min_resources=10,
             max_resources=500, 
+            n_candidates=100,
             random_state=0
         )
 
