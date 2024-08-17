@@ -352,6 +352,11 @@ class Model:
         train_data = train_data_mdf[column_needed]._to_pandas()
         test_data = test_data_mdf[column_needed]._to_pandas()
 
+        train_data['five_minute_sin_2'] = train_data['five_minute_sin'] ** 4
+        train_data['five_minute_cos_2'] = train_data['five_minute_cos'] ** 4
+        test_data['five_minute_sin_2'] = test_data['five_minute_sin'] ** 4
+        test_data['five_minute_cos_2'] = test_data['five_minute_cos'] ** 4
+
         self.y_train = train_data[target_column]
         self.y_test = test_data[target_column]
 
