@@ -239,14 +239,19 @@ class Model:
         return x, pred_y, real_y
 
     def predict_all_and_export(self):
+        def get_run_time (speed, mileage_a, mileage_b) :
+            if speed == 0:
+                return 0
+            return abs(mileage_a - mileage_b) / speed
         pred_y = self.my_model.predict(self.x_test)
         results = self.x_original_test.copy()
         base_time = datetime(1970, 1, 1, tzinfo=timezone.utc)
         results['utc'] = results['utc'].apply(lambda x: base_time + timedelta(seconds=x))
         results['Predicted_speed'] = pred_y
         results['Real_speed'] = self.y_test.values
-        results['Predicted_time'] = (16.5 / pred_y) * 60
-        results['Real_time'] = (16.5 / self.y_test.values) * 60
+        results['Prediected_run_time'] = results.apply(lambda x: get_run_time(x['Predicted_speed'], x['start_mileage'], x['end_mileage']), axis=1)
+        results['Real_run_time'] = results.apply(lambda x: get_run_time(x['Real_speed'], x['start_mileage'], x['end_mileage']), axis=1)
+
         results = results.sort_values(by=['utc'], ascending=True)
         # results.to_csv('prediction_results.csv', index=False)
 
@@ -254,7 +259,7 @@ class Model:
             results.plot(x='utc', y=['Predicted_speed', 'Real_speed'], title='Real vs Predicted Speed in 2024/01 And 2024/02')
             plt.ylabel("speed(km/h)")
             plt.show()
-            results.plot(x='utc', y=['Predicted_time', 'Real_time'], title='Real vs Predicted time in 2024/01 And 2024/02')
+            results.plot(x='utc', y=['Prediected_run_time', 'Real_run_time'], title='Real vs Predicted time in 2024/01 And 2024/02')
             plt.ylabel("travel time(minute)")
             plt.show()
 
