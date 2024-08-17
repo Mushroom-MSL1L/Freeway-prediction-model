@@ -44,7 +44,8 @@ if __name__ == "__main__":
     print(preprocessed_data.head())
     print(car_map)
 
-    # m = Model()
+
+    m = Model()
     # all_columns = [ 'UTC',
     #         'ETagPairID', 'direction', 'highway', 'start_mileage', 'end_mileage', 'car', 'speed', 
     #         'year', 'month_sin', 'month_cos', 'day_sin', 'day_cos', 'five_minute_sin', 'five_minute_cos', 
@@ -68,8 +69,10 @@ if __name__ == "__main__":
     #     # 'construction_第一車道', 'construction_第二車道', 'construction_第三車道', 'construction_第四車道', 'construction_第五車道', 'construction_第六車道', 'construction_第七車道', 'construction_第八車道', 'construction_外側路肩', 'construction_內邊坡', 'construction_外邊坡'
     #     ]
     # first_data = preprocessed_data.query(f"ETagPairID == '01F0928N-01F0880N'")
-
+    # second_data = first_data.query(f"car == 0.049")
+    # third_data = second_data.query(f"construction_time > 0")
     # m.import_freeway(first_data, 'speed', column_needed)
+
     # params = {
     #     'n_estimators': [100, 200, 300, 400],
     #     'max_depth': list(range(3, 10)),
@@ -82,6 +85,7 @@ if __name__ == "__main__":
     #     file_name="01F0928N_01F0880N_XGBoost_random_search.joblib"
     # )
     # m.test()
+
     # m.train(
     #     _n_estimators=100, 
     #     _max_features=None, 

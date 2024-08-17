@@ -3,6 +3,7 @@ import pandas as pd
 import joblib
 import os
 import modin.pandas as mpd
+import matplotlib.pyplot as plt
 from scipy.stats import randint
 from datetime import datetime, timezone, timedelta
 
@@ -297,6 +298,13 @@ class Model:
             if speed == 0:
                 return 0
             return abs(mileage_a - mileage_b) / speed
+        def plot_figure(results):
+            results.plot(x='utc', y=['Predicted_speed', 'Real_speed'], title='Real vs Predicted Speed in 2024/01 And 2024/02')
+            plt.ylabel("speed(km/h)")
+            plt.show()
+            results.plot(x='utc', y=['Prediected_run_time', 'Real_run_time'], title='Real vs Predicted time in 2024/01 And 2024/02')
+            plt.ylabel("travel time(minute)")
+            plt.show()
         pred_y = self.my_model.predict(self.x_test)
         results = self.x_original_test.copy()
         base_time = datetime(1970, 1, 1, tzinfo=timezone.utc)
@@ -305,11 +313,13 @@ class Model:
         results['Real_speed'] = self.y_test.values
         results['Prediected_run_time'] = results.apply(lambda x: get_run_time(x['Predicted_speed'], x['start_mileage'], x['end_mileage']), axis=1)
         results['Real_run_time'] = results.apply(lambda x: get_run_time(x['Real_speed'], x['start_mileage'], x['end_mileage']), axis=1)
+
         results = results.sort_values(by=['utc'], ascending=True)
         results.to_csv('prediction_results.csv', index=False)
         print("prediction results exported")
         filtered_results = results[results['Real_run_time'] != 0]
         print("mape: ", np.mean(np.abs((filtered_results['Prediected_run_time'] - filtered_results['Real_run_time']) / filtered_results['Real_run_time']))*100, "%")
+        plot_figure(results)
 
 
     def import_model(self, file_name):
