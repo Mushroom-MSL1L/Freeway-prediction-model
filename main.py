@@ -70,6 +70,18 @@ if __name__ == "__main__":
     # first_data = preprocessed_data.query(f"ETagPairID == '01F0928N-01F0880N'")
 
     # m.import_freeway(first_data, 'speed', column_needed)
+    # params = {
+    #     'n_estimators': [100, 200, 300, 400],
+    #     'max_depth': list(range(3, 10)),
+    #     'learning_rate': [0.1, 0.05, 0.02, 0.01],
+    #     'min_child_weight': [1, 0.5, 0.2, 0.1, 0.05, 0.02, 0.01, 0.005, 0.002, 0.001]
+    # }
+    # m.train_XGBoost_random_search(
+    #     params=params,
+    #     save_model=True, 
+    #     file_name="01F0928N_01F0880N_XGBoost_random_search.joblib"
+    # )
+    # m.test()
     # m.train(
     #     _n_estimators=100, 
     #     _max_features=None, 

@@ -6,13 +6,14 @@ import modin.pandas as mpd
 from scipy.stats import randint
 from datetime import datetime, timezone, timedelta
 
+import xgboost as xgb
 
 from sklearn.inspection import permutation_importance
 from sklearn.datasets import load_diabetes
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 from sklearn.experimental import enable_halving_search_cv  # noqa
-from sklearn.model_selection import train_test_split, HalvingRandomSearchCV, HalvingGridSearchCV
+from sklearn.model_selection import RandomizedSearchCV, train_test_split, HalvingRandomSearchCV, HalvingGridSearchCV
 
 
 """
@@ -130,6 +131,59 @@ class Model:
         path = self.__get_path (os.path.join(directory, "record.txt"))
         with open(path, 'a') as f:
             f.write(content + '\n')
+
+    def train_XGBoost(self, _n_estimators, _max_depth, _learning_rate, _min_child_weight, save_model=True, file_name=""):
+        os.makedirs(self.__get_path('models/'), exist_ok=True)
+        name, _ = os.path.splitext(file_name)
+        path = self.__get_path('models/' + name + '/' + file_name)
+        
+        path = self.__rename_and_create_folder(path)
+
+        self.my_model = xgb.XGBRegressor(n_estimators=_n_estimators, 
+                                        max_depth=_max_depth, 
+                                        learning_rate=_learning_rate, 
+                                        min_child_weight=_min_child_weight)
+        
+        self.my_model = self.my_model.fit(self.x_train, self.y_train)
+
+        if save_model:
+            joblib.dump(self.my_model, path)
+            self.model_path = path
+            columns = self.x_train.columns.tolist()
+
+            content = "XGBRegressor\n"
+            content += "n_estimators: " + str(_n_estimators) + "\n"
+            content += "max_depth: " + str(_max_depth) + "\n"
+            content += "learning_rate: " + str(_learning_rate) + "\n"
+            content += "min_child_weight: " + str(_min_child_weight) + "\n"
+            content += "features: \n"
+            for column in columns:
+                content += "  " + column + "\n"
+            self.__record(content)
+            print("Model saved at", path)
+
+    def train_XGBoost_random_search(self, params, save_model=True, file_name=""):
+        xgb_model = xgb.XGBRegressor()
+
+        random_search = RandomizedSearchCV(xgb_model, 
+                                        param_distributions=params, 
+                                        n_iter=50, # sample 100 times
+                                        cv=2, 
+                                        verbose=1, 
+                                        n_jobs=-1) # all processors
+        random_search.fit(self.x_train, self.y_train)
+
+        best_params = random_search.best_params_
+
+        self.train_XGBoost(
+            _n_estimators=best_params['n_estimators'], 
+            _max_depth=best_params['max_depth'], 
+            _learning_rate=best_params['learning_rate'], 
+            _min_child_weight=best_params['min_child_weight'],
+            save_model=save_model, 
+            file_name=file_name
+        )
+
 
 # include constant hyperparameters
     def train_grid_search(self, save_model=True, file_name=""):
