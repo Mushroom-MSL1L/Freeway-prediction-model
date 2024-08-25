@@ -187,7 +187,7 @@ def convert_and_store_traffic_accident(store_path, conn):
         事故處理小組完成 TEXT,    not need
         事件排除 TEXT,           not need
         處理分鐘 INTEGER,        store
-        事故類型 TEXT,           not need
+        事故類型 TEXT,           change to integer and store
         死亡 INTEGER,           not need
         受傷 INTEGER,           not need
         內路肩 INTEGER,         store
@@ -253,6 +253,18 @@ def convert_and_store_traffic_accident(store_path, conn):
         dt = datetime(year, month, day, hour, minute, tzinfo=timezone.utc)
         return int(dt.timestamp())
         # end of transform_to_utc function
+    def transform_accident_level (x) :
+        x = str(x)
+        if pd.isnull(x):
+            return None
+        elif x == 'A1':
+            return 3
+        elif x == 'A2':
+            return 2
+        elif x == 'A3':
+            return 1
+        else:
+            return None
     create_table_query = '''
     CREATE TABLE IF NOT EXISTS traffic_accident (
         ID              INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -265,6 +277,7 @@ def convert_and_store_traffic_accident(store_path, conn):
         Month           INTEGER,
         Day             INTEGER,
         RecoveryMinute  INTEGER,
+        AccidentLevel   INTEGER,
         內路肩          BOOLEAN,
         內車道          BOOLEAN,
         中內車道        BOOLEAN,
@@ -283,7 +296,7 @@ def convert_and_store_traffic_accident(store_path, conn):
     data_file = pd.read_excel(store_path)
     selected_columns = [
         '年', '月', '日', '時', '分', '國道名稱', '方向', '里程', 
-        '處理分鐘', '內路肩', '內車道', '中內車道', '中車道', 
+        '處理分鐘', '事故類型', '內路肩', '內車道', '中內車道', '中車道', 
         '中外車道', '外車道', '外路肩', '匝道'
     ]
     data_subset = data_file[selected_columns]
@@ -295,6 +308,7 @@ def convert_and_store_traffic_accident(store_path, conn):
     data_subset['Direction'] = data_subset['方向'].apply(convert_direction)
     data_subset['FiveMinuteStart'] = (data_subset['時'] * 60 + data_subset['分']) // 5
     data_subset['FiveMinuteEnd'] =  (data_subset['時'] * 60 + data_subset['分'] + data_subset['處理分鐘']) // 5
+    data_subset['AccidentLevel'] = data_subset['事故類型'].apply(transform_accident_level)
     data_subset['內路肩'] = data_subset['內路肩'].apply(one_hot)
     data_subset['內車道'] = data_subset['內車道'].apply(one_hot)
     data_subset['中內車道'] = data_subset['中內車道'].apply(one_hot)
@@ -321,7 +335,7 @@ def convert_and_store_traffic_accident(store_path, conn):
     data_subset[data_need_to_be_bool].astype(bool)
 
     # store data to database
-    final_columns = ['Highway', 'Direction', 'Mileage', 'StartUTC', 'EndUTC', 'Year', 'Month', 'Day', 'RecoveryMinute', '內路肩', '內車道', '中內車道', '中車道', '中外車道', '外車道', '外路肩', '匝道']
+    final_columns = ['Highway', 'Direction', 'Mileage', 'StartUTC', 'EndUTC', 'Year', 'Month', 'Day', 'RecoveryMinute', 'AccidentLevel', '內路肩', '內車道', '中內車道', '中車道', '中外車道', '外車道', '外路肩', '匝道']
     # print(data_subset[final_columns].head())
     # print("columns name: ", data_subset.columns.to_list())
     data_subset[final_columns].to_sql('traffic_accident', conn.db, if_exists='append', index=False)

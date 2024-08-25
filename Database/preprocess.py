@@ -335,6 +335,7 @@ SELECT
     traffic_accident.Mileage AS accident_Mileage,
 
     traffic_accident.RecoveryMinute,
+    traffic_accident.AccidentLevel,
     traffic_accident.內路肩,
     traffic_accident.內車道,
     traffic_accident.中內車道, 
@@ -419,6 +420,7 @@ SELECT
 
     ETagPairLive_temp.is_accident,
     ETagPairLive_temp.RecoveryMinute,
+    ETagPairLive_temp.AccidentLevel,
     ETagPairLive_temp.內路肩 AS traffic_accident_內路肩,
     ETagPairLive_temp.內車道 AS traffic_accident_內車道,
     ETagPairLive_temp.中內車道 AS traffic_accident_中內車道,
@@ -517,6 +519,7 @@ CREATE TABLE IF NOT EXISTS preprocessed_data (
 
     has_accident BOOLEAN,
     recovery_time INTEGER,
+    accident_level INTEGER,
     traffic_accident_內路肩 BOOLEAN,
     traffic_accident_內車道 BOOLEAN,
     traffic_accident_中內車道 BOOLEAN,
@@ -548,7 +551,7 @@ CREATE TABLE IF NOT EXISTS preprocessed_data (
             'ETagPairID', 'Direction', 'Highway', 'StartMileage', 'EndMileage', 'VehicleType', 'SpaceMeanSpeed', 
             'Year', 'month_sin', 'month_cos', 'day_sin', 'day_cos', 'five_minute_sin', 'five_minute_cos', 'weekday_sin', 'weekday_cos',
             'is_weekend', 'is_holiday', 'holiday_sin', 'holiday_cos',
-            'is_accident', 'RecoveryMinute', 'traffic_accident_內路肩', 'traffic_accident_內車道', 'traffic_accident_中內車道', 'traffic_accident_中車道', 'traffic_accident_中外車道', 'traffic_accident_外車道', 'traffic_accident_外路肩', 'traffic_accident_匝道',
+            'is_accident', 'RecoveryMinute', 'AccidentLevel', 'traffic_accident_內路肩', 'traffic_accident_內車道', 'traffic_accident_中內車道', 'traffic_accident_中車道', 'traffic_accident_中外車道', 'traffic_accident_外車道', 'traffic_accident_外路肩', 'traffic_accident_匝道',
             'is_construction', 'ConstructionMinute', '第1車道', '第2車道', '第3車道', '第4車道', '第5車道', '第6車道', '第7車道', '第8車道', 'construction_外側路肩', 'construction_內邊坡', 'construction_外邊坡'
         ]
         rename_dict = {
@@ -563,6 +566,7 @@ CREATE TABLE IF NOT EXISTS preprocessed_data (
 
             'is_accident': 'has_accident',
             'RecoveryMinute': 'recovery_time',
+            'AccidentLevel': 'accident_level',
 
             'is_construction': 'has_construction',
             'ConstructionMinute': 'construction_time',
