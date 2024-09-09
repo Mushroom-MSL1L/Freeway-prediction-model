@@ -53,11 +53,11 @@ class Model:
             import_model: a boolean indicate whether model is from 'path' variable, or train a new model 
             save_model:   a boolean indicate whether model is saved to 'path' variable 
         """
-        os.makedirs(self.__get_path ('models/'), exist_ok=True)
+        os.makedirs(self._get_path ('models/'), exist_ok=True)
         name, _ = os.path.splitext(file_name)
-        path = self.__get_path ('models/' + name + '/' + file_name)
+        path = self._get_path ('models/' + name + '/' + file_name)
         
-        path = self.__rename_and_create_folder(path)
+        path = self._rename_and_create_folder(path)
         self.my_model = RandomForestRegressor(n_estimators=_n_estimators, max_features=_max_features, max_depth=_max_depth, min_samples_leaf=_min_samples_leaf)
         self.my_model = self.my_model.fit(self.x_train, self.y_train)
 
@@ -73,7 +73,7 @@ class Model:
             content += "features: \n"
             for column in columns:
                 content += "  " + column + "\n"
-            self.__record(content)
+            self._record(content)
             print("model saved, at ", path)
 
     def test(self):
@@ -101,15 +101,15 @@ class Model:
                             f" +/- {performance.importances_std[i]:.3f}\n"
         content += "--------------------end--------------------\n"
         print(content)
-        self.__record(content)
+        self._record(content)
 
-    def __get_path (self, file_name):
+    def _get_path (self, file_name):
         current_file_path = os.path.realpath(__file__)
         current_dir_path = os.path.dirname(current_file_path)
         file_path = os.path.join(current_dir_path, file_name)
         return file_path
 
-    def __rename_and_create_folder(self, file_path):
+    def _rename_and_create_folder(self, file_path):
         directory, original_filename = os.path.split(file_path)
         parent_directory = os.path.dirname(directory)
         name, ext = os.path.splitext(original_filename)
@@ -127,18 +127,18 @@ class Model:
         os.makedirs(os.path.join(parent_directory, new_folder), exist_ok=True)
         return new_file_path
 
-    def __record(self, content):
+    def _record(self, content):
         directory, original_filename = os.path.split(self.model_path)
-        path = self.__get_path (os.path.join(directory, "record.txt"))
+        path = self._get_path (os.path.join(directory, "record.txt"))
         with open(path, 'a') as f:
             f.write(content + '\n')
 
     def train_XGBoost(self, _n_estimators, _max_depth, _learning_rate, _min_child_weight, save_model=True, file_name=""):
-        os.makedirs(self.__get_path('models/'), exist_ok=True)
+        os.makedirs(self._get_path('models/'), exist_ok=True)
         name, _ = os.path.splitext(file_name)
-        path = self.__get_path('models/' + name + '/' + file_name)
+        path = self._get_path('models/' + name + '/' + file_name)
         
-        path = self.__rename_and_create_folder(path)
+        path = self._rename_and_create_folder(path)
 
         self.my_model = xgb.XGBRegressor(n_estimators=_n_estimators, 
                                         max_depth=_max_depth, 
@@ -160,7 +160,7 @@ class Model:
             content += "features: \n"
             for column in columns:
                 content += "  " + column + "\n"
-            self.__record(content)
+            self._record(content)
             print("Model saved at", path)
 
     def train_XGBoost_random_search(self, params, save_model=True, file_name=""):
@@ -188,10 +188,10 @@ class Model:
 
 # include constant hyperparameters
     def train_grid_search(self, save_model=True, file_name=""):
-        os.makedirs(self.__get_path ('models/'), exist_ok=True)
+        os.makedirs(self._get_path ('models/'), exist_ok=True)
         name, _ = os.path.splitext(file_name)
-        path = self.__get_path ('models/' + name + '/' + file_name)
-        path = self.__rename_and_create_folder(path)
+        path = self._get_path ('models/' + name + '/' + file_name)
+        path = self._rename_and_create_folder(path)
         
         clf = RandomForestRegressor(random_state=0)
         param_grid = {
@@ -216,15 +216,15 @@ class Model:
             content += "features: \n"
             for column in columns:
                 content += "  " + column + "\n"
-            self.__record(content)
+            self._record(content)
             print("Model saved, at ", path)
 
 # include constant hyperparameters
     def train_halving_random (self, save_model=True, file_name=""):
-        os.makedirs(self.__get_path ('models/'), exist_ok=True)
+        os.makedirs(self._get_path ('models/'), exist_ok=True)
         name, _ = os.path.splitext(file_name)
-        path = self.__get_path ('models/' + name + '/' + file_name)
-        path = self.__rename_and_create_folder(path)
+        path = self._get_path ('models/' + name + '/' + file_name)
+        path = self._rename_and_create_folder(path)
         
         clf = RandomForestRegressor(random_state=0)
         param_grid = {
@@ -256,7 +256,7 @@ class Model:
             content += "features: \n"
             for column in columns:
                 content += "  " + column + "\n"
-            self.__record(content)
+            self._record(content)
             print("Model saved, at ", path)
 
     def predict(self, query, n = 1, type='random'):
@@ -324,7 +324,7 @@ class Model:
 
     def import_model(self, file_name):
         name, _ = os.path.splitext(file_name)
-        path = self.__get_path ('models/' + name + '/' + file_name)
+        path = self._get_path ('models/' + name + '/' + file_name)
         try :
             self.my_model = joblib.load(path)
             self.model_path = path
