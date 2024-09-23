@@ -6,10 +6,12 @@ import os
 import joblib
 import matplotlib.pyplot as plt
 from datetime import datetime, timezone, timedelta
-from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
+from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor, IsolationForest
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 from sklearn.inspection import permutation_importance
-
+from sklearn.neighbors import LocalOutlierFactor
+from sklearn.experimental import enable_halving_search_cv  # noqa
+from sklearn.model_selection import HalvingRandomSearchCV
 
 class two_model(Model) :
     y_train_outlier = pd.DataFrame()
@@ -22,9 +24,6 @@ class two_model(Model) :
         super().__init__()
 
     def train(self, save_model=False, file_name="two_model.joblib"): 
-        print("type of y_train_outlier: ", type(self.y_train_outlier))
-        print("type of y_train: ", type(self.y_train))
-        print("type of x_train: ", type(self.x_train))
         self.classifier = RandomForestClassifier()
         self.classifier.fit(self.x_train, self.y_train_outlier)
         normal_index = self.y_train_outlier[self.y_train_outlier == False].index
@@ -41,11 +40,12 @@ class two_model(Model) :
         path = self._get_path ('models/' + name + '/' + file_name)
         path = self._rename_and_create_folder(path)
         directory, filename = os.path.split(path)
+        name, _ = os.path.splitext(filename)
 
         if save_model:
-            joblib.dump(self.classifier, directory + "/" + filename + "_classifier.joblib")
-            joblib.dump(self.normal_regressors, directory + "/" + filename + "_nor_reg.joblib")
-            joblib.dump(self.outlier_regressors, directory + "/" + filename + "_out_reg.joblib")
+            joblib.dump(self.classifier, directory + "/" + name + "_classifier.joblib")
+            joblib.dump(self.normal_regressors, directory + "/" + name + "_nor_reg.joblib")
+            joblib.dump(self.outlier_regressors, directory + "/" + name + "_out_reg.joblib")
             self.model_path = path
             columns = self.x_train.columns.tolist()
             content = "RandomForestRegressor and RandomForestClassifier\n"
@@ -96,6 +96,24 @@ class two_model(Model) :
         content += "--------------------end--------------------\n"
         print(content)
         self._record(content)
+
+    def _rename_and_create_folder(self, file_path):
+        directory, original_filename = os.path.split(file_path)
+        parent_directory = os.path.dirname(directory)
+        name, ext = os.path.splitext(original_filename)
+        
+        new_filename = original_filename
+        new_folder = name
+        counter = 0
+        
+        while os.path.exists(os.path.join(parent_directory, new_folder)):
+            counter += 1
+            new_filename = f"{name}_{counter}{ext}"
+            new_folder = f"{name}_{counter}"
+        
+        new_file_path = os.path.join(parent_directory, new_folder, new_filename)
+        os.makedirs(os.path.join(parent_directory, new_folder), exist_ok=True)
+        return new_file_path
 
     def import_freeway(self, mdf, target_column, column_needed):
         def outlier_detection(y, target_column):

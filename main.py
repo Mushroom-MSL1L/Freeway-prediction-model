@@ -1,6 +1,8 @@
 from Database import Preprocess
 from Model import Model
 from Model import two_model
+import sweetviz as sv
+import pandas as pd
 
 """
 check before run :
@@ -46,7 +48,7 @@ if __name__ == "__main__":
     print(car_map)
 
 
-    m = Model()
+    # m = Model()
     t = two_model()
     all_columns = [ 'UTC',
             'ETagPairID', 'direction', 'highway', 'start_mileage', 'end_mileage', 'car', 'speed', 
@@ -73,9 +75,13 @@ if __name__ == "__main__":
         ]
     first_data = preprocessed_data.query(f"ETagPairID == '01F0928N-01F0880N'")
     first_data = first_data.query(f"car == 0.869")
-    # third_data = second_data.query(f"construction_time > 0")
-    # m.import_freeway(first_data, 'speed', column_needed)
+    # # third_data = second_data.query(f"construction_time > 0")
+    # # m.import_freeway(first_data, 'speed', column_needed)
     t.import_freeway(first_data, 'speed', column_needed)
+
+    sweet_report = sv.analyze(pd.read_csv("outliers.csv"))
+    sweet_report.show_html('sweet_report.html')
+
     t.train(save_model=True, file_name="01F0928N_01F0880N.joblib")
     t.test()
     t.predict_all_and_export()
