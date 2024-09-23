@@ -199,6 +199,7 @@ class two_model(Model) :
         outliers_data = outliers_data[column_needed]
         outliers_data.to_csv(file_name, index=False)
         print(f"Outliers exported to {file_name}")
+        plt.figure(figsize=(30, 10))
         plt.plot(mdf.index, mdf[target_column], label=f'{target_column} line')
         outliers_indices = outliers[outliers == 1].index
         plt.scatter(outliers_indices, mdf.loc[outliers_indices, target_column], color='red', label='Outliers', edgecolors='black', zorder=5)
