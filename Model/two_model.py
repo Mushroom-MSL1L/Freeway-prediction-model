@@ -115,16 +115,32 @@ class two_model(Model) :
         os.makedirs(os.path.join(parent_directory, new_folder), exist_ok=True)
         return new_file_path
 
+
+    def zScore_outlier_detection(self, y, target_column):
+        temp = mpd.DataFrame()
+        temp[target_column] = y[target_column]
+        mean = temp[target_column].mean()
+        std = temp[target_column].std()
+        threshold = 3
+        temp['z_score'] = (temp[target_column] - mean) / std
+        temp['is_outlier'] = temp['z_score'].apply(lambda x: x < -threshold or x > threshold)
+        return temp["is_outlier"]
+    def local_outlier_factor_detection(self, y, target_column) : 
+        temp = mpd.DataFrame()
+        temp[target_column] = y[target_column]
+        clf = LocalOutlierFactor(n_neighbors=50, contamination="auto")
+        temp['is_outlier'] = clf.fit_predict(temp)
+        temp['is_outlier'] = temp['is_outlier'].apply(lambda x: x == -1)
+        return temp["is_outlier"]
+    def isolation_forest_detection(self, y, target_column) :
+        temp = mpd.DataFrame()
+        temp[target_column] = y[target_column]
+        clf = IsolationForest(random_state=0)
+        temp['is_outlier'] = clf.fit_predict(temp)
+        temp['is_outlier'] = temp['is_outlier'].apply(lambda x: x == -1)
+        return temp["is_outlier"]
+
     def import_freeway(self, mdf, target_column, column_needed):
-        def outlier_detection(y, target_column):
-            temp = mpd.DataFrame()
-            temp[target_column] = y[target_column]
-            mean = temp[target_column].mean()
-            std = temp[target_column].std()
-            threshold = 3
-            temp['z_score'] = (temp[target_column] - mean) / std
-            temp['is_outlier'] = temp['z_score'].apply(lambda x: x < -threshold or x > threshold)
-            return temp["is_outlier"]
         train_data_mdf = mpd.DataFrame()
         test_data_mdf = mpd.DataFrame()
 
@@ -134,7 +150,9 @@ class two_model(Model) :
         test_data_mdf = mdf.query('year == 2024')
 
         self.x_original_test = test_data_mdf.copy()
-        self.y_train_outlier = outlier_detection(train_data_mdf, target_column)._to_pandas()
+        self.y_train_outlier = self.local_outlier_factor_detection(train_data_mdf, target_column)._to_pandas()
+
+        self.export_outliers_to_csv(train_data_mdf, self.y_train_outlier, target_column, column_needed, "outliers.csv")
 
         train_data = train_data_mdf[column_needed]._to_pandas()
         test_data = test_data_mdf[column_needed]._to_pandas()
@@ -173,3 +191,28 @@ class two_model(Model) :
         filtered_results = results[results['Real_run_time'] != 0]
         print("mape: ", np.mean(np.abs((filtered_results['Prediected_run_time'] - filtered_results['Real_run_time']) / filtered_results['Real_run_time']))*100, "%")
         plot_figure(results)
+        self.residual_graph()
+
+    def export_outliers_to_csv(self, mdf, outliers, target_column, column_needed, file_name="outliers.csv"):        
+        mdf = mdf[mdf[target_column] > 0]
+        outliers_data = mdf.loc[outliers.values]
+        outliers_data = outliers_data[column_needed]
+        outliers_data.to_csv(file_name, index=False)
+        print(f"Outliers exported to {file_name}")
+        plt.plot(mdf.index, mdf[target_column], label=f'{target_column} line')
+        outliers_indices = outliers[outliers == 1].index
+        plt.scatter(outliers_indices, mdf.loc[outliers_indices, target_column], color='red', label='Outliers', edgecolors='black', zorder=5)
+        plt.xlabel('Index')
+        plt.ylabel(target_column)
+        plt.title(f'{target_column} with Outliers Marked')
+        plt.legend()
+        plt.show()
+
+    def residual_graph (self):
+        residual = self.y_test - self.y_pred_test
+        plt.scatter(self.y_pred_test, residual)
+        plt.axhline(y=0, color='r', linestyle='-')
+        plt.xlabel('Predicted values')
+        plt.ylabel('Residuals')
+        plt.title('Residuals vs Predicted values')
+        plt.show()
